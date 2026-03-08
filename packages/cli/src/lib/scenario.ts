@@ -3,14 +3,33 @@ import type { ArtifactPaths } from "./artifacts.ts";
 import { sendControlRequest } from "./control.ts";
 import type { E2EConfig } from "../types.ts";
 
-export async function runScenarios(config: E2EConfig, artifacts: ArtifactPaths): Promise<void> {
+export async function runScenarios(
+  config: E2EConfig,
+  artifacts: ArtifactPaths,
+  hooks: {
+    onStepStarted?: (event: Record<string, unknown>) => void;
+    onStepFinished?: (event: Record<string, unknown>) => void;
+  } = {}
+): Promise<void> {
   for (const scenario of config.scenarios) {
     for (const [index, step] of scenario.steps.entries()) {
       const id = `${scenario.id}-${index}`;
+      hooks.onStepStarted?.({
+        scenario: scenario.id,
+        stepIndex: index,
+        action: step.action
+      });
       if (step.action === "runCommand") {
-        await sendControlRequest("127.0.0.1", 44712, {
+        const response = await sendControlRequest("127.0.0.1", 44712, {
           id,
           action: "runCommand",
+          command: step.value
+        });
+        hooks.onStepFinished?.({
+          scenario: scenario.id,
+          stepIndex: index,
+          action: step.action,
+          ok: response.ok,
           command: step.value
         });
         continue;
@@ -26,6 +45,13 @@ export async function runScenarios(config: E2EConfig, artifacts: ArtifactPaths):
         if (!response.ok) {
           throw new Error(response.message);
         }
+        hooks.onStepFinished?.({
+          scenario: scenario.id,
+          stepIndex: index,
+          action: step.action,
+          ok: response.ok,
+          text: response.result?.text
+        });
         continue;
       }
 
@@ -41,6 +67,13 @@ export async function runScenarios(config: E2EConfig, artifacts: ArtifactPaths):
         if (!response.ok) {
           throw new Error(response.message);
         }
+        hooks.onStepFinished?.({
+          scenario: scenario.id,
+          stepIndex: index,
+          action: step.action,
+          ok: response.ok,
+          path: response.result?.path
+        });
         continue;
       }
 
@@ -53,11 +86,25 @@ export async function runScenarios(config: E2EConfig, artifacts: ArtifactPaths):
         if (!response.ok) {
           throw new Error(response.message);
         }
+        hooks.onStepFinished?.({
+          scenario: scenario.id,
+          stepIndex: index,
+          action: step.action,
+          ok: response.ok,
+          text: step.text
+        });
         continue;
       }
 
       if (step.action === "delay") {
         await Bun.sleep(step.delayMs ?? 0);
+        hooks.onStepFinished?.({
+          scenario: scenario.id,
+          stepIndex: index,
+          action: step.action,
+          ok: true,
+          delayMs: step.delayMs ?? 0
+        });
       }
     }
   }

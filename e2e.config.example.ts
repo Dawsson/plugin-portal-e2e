@@ -18,6 +18,17 @@ export default defineConfig({
       instanceName: "plugin-portal-e2e-1.21.4"
     }
   },
+  cleanup: {
+    closeClient: true,
+    stopContainers: true,
+    wipeVolumes: false
+  },
+  recording: {
+    enabled: false,
+    provider: "none",
+    composeRightPanel: true,
+    panelWidth: 480
+  },
   topology: {
     preset: "single-paper",
     servers: [
@@ -54,4 +65,3 @@ export default defineConfig({
     }
   ]
 });
-

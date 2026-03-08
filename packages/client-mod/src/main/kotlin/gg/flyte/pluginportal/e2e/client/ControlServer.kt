@@ -58,6 +58,7 @@ class ControlServer(
                     "dismissOnboarding" -> dismissOnboarding(request)
                     "resumeGame" -> resumeGame(request)
                     "connect" -> connect(request)
+                    "quitClient" -> quitClient(request)
                     "runCommand" -> runCommand(request)
                     "takeScreenshot" -> takeScreenshot(request)
                     "waitForChat" -> waitForChat(request)
@@ -315,6 +316,22 @@ class ControlServer(
                     )
                 }
             }
+        }
+        return future.get(10, TimeUnit.SECONDS)
+    }
+
+    private fun quitClient(request: ControlRequest): ControlResponse {
+        val future = CompletableFuture<ControlResponse>()
+        val client = MinecraftClient.getInstance()
+        client.execute {
+            future.complete(
+                ControlResponse(
+                    id = request.id,
+                    ok = true,
+                    message = "Stopping client"
+                )
+            )
+            client.scheduleStop()
         }
         return future.get(10, TimeUnit.SECONDS)
     }

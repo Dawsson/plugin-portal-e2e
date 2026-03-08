@@ -20,6 +20,17 @@ const config = defineConfig({
       profile: process.env.PP_E2E_PRISM_PROFILE ?? "Dawsson"
     }
   },
+  cleanup: {
+    closeClient: true,
+    stopContainers: true,
+    wipeVolumes: false
+  },
+  recording: {
+    enabled: true,
+    provider: "obs",
+    composeRightPanel: true,
+    panelWidth: 480
+  },
   topology: {
     preset: "single-paper",
     servers: [

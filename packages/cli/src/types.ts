@@ -46,6 +46,19 @@ export interface ClientConfig {
   };
 }
 
+export interface CleanupConfig {
+  closeClient: boolean;
+  stopContainers: boolean;
+  wipeVolumes: boolean;
+}
+
+export interface RecordingConfig {
+  enabled: boolean;
+  provider: "obs" | "ffmpeg" | "none";
+  composeRightPanel: boolean;
+  panelWidth: number;
+}
+
 export interface ServerNode {
   id: string;
   family: ServerFamily | ProxyFamily;
@@ -74,6 +87,8 @@ export interface E2EConfig {
   apiTarget: ApiTarget;
   releaseSource: ReleaseSource;
   client: ClientConfig;
+  cleanup: CleanupConfig;
+  recording: RecordingConfig;
   topology: {
     preset: "single-paper" | "paper-family" | "proxy-velocity" | "proxy-waterfall" | "proxy-bungeecord" | "full";
     servers: ServerNode[];
@@ -90,4 +105,6 @@ export interface LocalState {
   prismInstanceRoot?: string;
   obsAppPath?: string;
   obsSceneCollection?: string;
+  obsWebSocketPort?: number;
+  obsWebSocketPassword?: string;
 }

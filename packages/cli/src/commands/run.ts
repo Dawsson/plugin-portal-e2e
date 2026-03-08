@@ -1,17 +1,20 @@
-import { existsSync, readdirSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, readdirSync, rmSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { E2EConfig, ServerFamily } from "../types.ts";
 import { getArtifactPaths } from "../lib/artifacts.ts";
-import { dockerComposeUp, waitForServiceLog, writeComposeFile } from "../lib/docker.ts";
+import { dockerComposeDown, dockerComposeUp, waitForServiceLog, writeComposeFile } from "../lib/docker.ts";
 import { runScenarios } from "../lib/scenario.ts";
 import { resolveReleaseSource } from "../lib/release.ts";
-import { launchPrismClient } from "../lib/prism.ts";
+import { closePrismClient, launchPrismClient } from "../lib/prism.ts";
 import { waitForPort } from "../lib/wait.ts";
 import { loadLocalState } from "../lib/state.ts";
 import { ensurePrismInstance } from "../lib/prism-instance.ts";
 import { runCommand } from "../lib/exec.ts";
 import { sendControlRequest, waitForClientMenu, waitForClientReady } from "../lib/control.ts";
+import { TimelineWriter } from "../lib/timeline.ts";
+import { exportServiceLogs, startComposeLogCapture } from "../lib/logs.ts";
+import { startRuntimeWatchers } from "../lib/watch.ts";
 
 function isBackendFamily(family: string): family is ServerFamily {
   return family === "paper" || family === "purpur" || family === "pufferfish" || family === "spigot";
@@ -43,15 +46,31 @@ function cleanServerRuntime(root: string, config: E2EConfig): void {
 
 export async function runPreset(root: string, config: E2EConfig, mode: "run" | "record"): Promise<void> {
   const artifacts = getArtifactPaths(root, config);
+  const timeline = new TimelineWriter(artifacts);
+  timeline.write({
+    type: "run.started",
+    mode,
+    runRoot: artifacts.runRoot
+  });
+
+  let composePath = "";
+  let instanceDir = "";
+  let composeLogs: { stop(): Promise<void> } | null = null;
+  let runtimeWatchers: { stop(): Promise<void> } | null = null;
+  let runError: Error | null = null;
+
+  try {
   const modBuild = runCommand(["./gradlew", ":packages:client-mod:build"], root);
   if (!modBuild.ok) {
     throw new Error(`Failed to build client mod\n${modBuild.stderr}`);
   }
+  timeline.write({ type: "phase.completed", phase: "client-mod-build", ok: true });
   const release = resolveReleaseSource(root, config);
-  const composePath = writeComposeFile(root, config, release);
+  timeline.write({ type: "phase.completed", phase: "release-resolve", kind: release.kind });
+  composePath = writeComposeFile(root, config, release);
   const state = await loadLocalState(root);
   const modJarPath = join(root, "packages/client-mod/build/libs/plugin-portal-e2e-client-0.1.0.jar");
-  await ensurePrismInstance(root, config.client, state, modJarPath);
+  instanceDir = await ensurePrismInstance(root, config.client, state, modJarPath);
   const summary = {
     mode,
     projectName: config.projectName,
@@ -75,6 +94,8 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
   console.log(`Scenarios: ${config.scenarios.map((scenario) => scenario.id).join(", ")}`);
   cleanServerRuntime(root, config);
   dockerComposeUp(composePath, root);
+  composeLogs = startComposeLogCapture(composePath, root, artifacts, timeline);
+  runtimeWatchers = await startRuntimeWatchers(root, config, timeline);
   const primaryBackend = config.topology.servers.find((server) => isBackendFamily(server.family));
   if (!primaryBackend) {
     throw new Error("No backend server is configured in the current topology");
@@ -114,6 +135,75 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
   if (!resumeResponse.ok) {
     throw new Error(resumeResponse.message);
   }
-  await runScenarios(config, artifacts);
+  await runScenarios(config, artifacts, {
+    onStepStarted: (event) => {
+      timeline.write({
+        type: "scenario.step.started",
+        ...event
+      });
+    },
+    onStepFinished: (event) => {
+      timeline.write({
+        type: event.action === "takeScreenshot" ? "artifact.screenshot" : "scenario.step.finished",
+        ...event
+      });
+    }
+  });
   console.log("Run completed.");
+  timeline.write({ type: "run.finished", ok: true });
+  } catch (error) {
+    runError = error instanceof Error ? error : new Error(String(error));
+    timeline.write({
+      type: "run.finished",
+      ok: false,
+      error: runError.message
+    });
+  } finally {
+    await runtimeWatchers?.stop();
+    await composeLogs?.stop();
+    if (composePath) {
+      await exportServiceLogs(composePath, root, config, artifacts);
+    }
+
+    if (instanceDir) {
+      const clientLog = join(instanceDir, "minecraft/logs/latest.log");
+      if (existsSync(clientLog)) {
+        copyFileSync(clientLog, join(artifacts.logs, "client.latest.log"));
+      }
+    }
+
+    await writeFile(
+      join(artifacts.data, "run-summary.json"),
+      `${JSON.stringify({
+        startedAt: timeline.startedIso(),
+        finishedAt: new Date().toISOString(),
+        ok: runError === null,
+        composePath,
+        instanceDir,
+        artifacts
+      }, null, 2)}\n`,
+      "utf8"
+    );
+
+    if (config.cleanup.closeClient) {
+      try {
+        await sendControlRequest("127.0.0.1", 44712, {
+          id: "quit-client",
+          action: "quitClient"
+        });
+      } catch {
+        closePrismClient(config.client);
+      }
+    }
+
+    if (composePath && config.cleanup.stopContainers) {
+      dockerComposeDown(composePath, root, config.cleanup.wipeVolumes);
+    }
+
+    await timeline.close();
+  }
+
+  if (runError) {
+    throw runError;
+  }
 }

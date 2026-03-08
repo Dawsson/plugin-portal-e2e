@@ -78,6 +78,17 @@ export const e2eConfigSchema = z.object({
       profile: z.string().optional()
     })
   }),
+  cleanup: z.object({
+    closeClient: z.boolean().default(true),
+    stopContainers: z.boolean().default(true),
+    wipeVolumes: z.boolean().default(false)
+  }),
+  recording: z.object({
+    enabled: z.boolean().default(false),
+    provider: z.enum(["obs", "ffmpeg", "none"]).default("none"),
+    composeRightPanel: z.boolean().default(true),
+    panelWidth: z.number().int().positive().default(480)
+  }),
   topology: z.object({
     preset: z.enum(["single-paper", "paper-family", "proxy-velocity", "proxy-waterfall", "proxy-bungeecord", "full"]),
     servers: z.array(serverSchema).min(1)
