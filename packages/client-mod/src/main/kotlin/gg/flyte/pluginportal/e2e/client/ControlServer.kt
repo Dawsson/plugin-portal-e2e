@@ -3,11 +3,11 @@ package gg.flyte.pluginportal.e2e.client
 import com.google.gson.Gson
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.screen.AccessibilityOnboardingScreen
+import net.minecraft.client.gui.screen.DeathScreen
 import net.minecraft.client.gui.screen.TitleScreen
 import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen
 import net.minecraft.client.gui.screen.multiplayer.MultiplayerServerListWidget
 import net.minecraft.client.option.ServerList
-import net.minecraft.client.network.ServerAddress
 import net.minecraft.client.network.ServerInfo
 import net.minecraft.client.util.ScreenshotRecorder
 import net.minecraft.SharedConstants
@@ -207,7 +207,29 @@ class ControlServer(
         val screen = client.currentScreen ?: return
         screen.close()
         if (client.currentScreen != null) {
-            client.setScreen(null)
+            client.setScreenAndRender(null)
+        }
+        if (client.currentScreen == null && client.player != null && client.world != null) {
+            client.mouse.lockCursor()
+        }
+    }
+
+    private fun prepareWorldView(client: MinecraftClient) {
+        if (client.player == null || client.world == null) {
+            return
+        }
+
+        if (client.currentScreen is DeathScreen || client.player?.isDead == true) {
+            PluginPortalE2EClient.logger.info("Respawning player before continuing automation")
+            client.player?.requestRespawn()
+        }
+
+        closeActiveScreen(client)
+        if (client.currentScreen != null) {
+            client.setScreenAndRender(null)
+        }
+        if (client.currentScreen == null) {
+            client.mouse.lockCursor()
         }
     }
 
@@ -216,7 +238,7 @@ class ControlServer(
         val client = MinecraftClient.getInstance()
         client.execute {
             if (client.player != null && client.world != null) {
-                closeActiveScreen(client)
+                prepareWorldView(client)
                 future.complete(
                     ControlResponse(
                         id = request.id,
@@ -251,18 +273,27 @@ class ControlServer(
         val future = CompletableFuture<ControlResponse>()
         val client = MinecraftClient.getInstance()
         client.execute {
-            if (client.player != null && client.world != null && client.currentScreen != null) {
-                closeActiveScreen(client)
-                client.execute {
-                    ScreenshotRecorder.saveScreenshot(directory, screenshotName, client.framebuffer) { _ ->
-                        future.complete(
-                            ControlResponse(
-                                id = request.id,
-                                ok = true,
-                                message = "Screenshot saved",
-                                result = mapOf("path" to screenshotFile.absolutePath)
-                            )
+            if (client.player != null && client.world != null) {
+                prepareWorldView(client)
+                executor.submit {
+                    Thread.sleep(350)
+                    client.execute {
+                        prepareWorldView(client)
+                        PluginPortalE2EClient.logger.info(
+                            "Capturing screenshot {}, final screen: {}",
+                            screenshotName,
+                            client.currentScreen?.javaClass?.name ?: "<none>"
                         )
+                        ScreenshotRecorder.saveScreenshot(directory, screenshotName, client.framebuffer) { _ ->
+                            future.complete(
+                                ControlResponse(
+                                    id = request.id,
+                                    ok = true,
+                                    message = "Screenshot saved",
+                                    result = mapOf("path" to screenshotFile.absolutePath)
+                                )
+                            )
+                        }
                     }
                 }
             } else {

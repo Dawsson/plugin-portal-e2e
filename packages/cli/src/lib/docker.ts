@@ -53,6 +53,7 @@ function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRe
     `      VERSION: ${node.version}`,
     "      EULA: \"TRUE\"",
     "      ONLINE_MODE: \"FALSE\"",
+    "      DIFFICULTY: peaceful",
     "      MEMORY: 2G"
   ];
   if (config.apiTarget.mode !== "production") {
