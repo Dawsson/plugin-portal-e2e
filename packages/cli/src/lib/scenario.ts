@@ -107,7 +107,11 @@ export async function runScenarios(
       hooks.onStepStarted?.({
         scenario: scenario.id,
         stepIndex: index,
-        action: step.action
+        action: step.action,
+        command: step.command ?? step.value,
+        text: step.text ?? step.value,
+        path: step.path,
+        pattern: step.pattern
       });
 
       if (step.action === "runCommand") {

@@ -98,7 +98,11 @@ export async function runServerScenarios(
         type: "scenario.step.started",
         scenario: scenario.id,
         stepIndex: index,
-        action: step.action
+        action: step.action,
+        command: step.command,
+        text: step.value,
+        path: step.path,
+        pattern: step.pattern
       });
 
       if (step.action === "delay") {

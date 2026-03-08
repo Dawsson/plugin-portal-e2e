@@ -1,7 +1,5 @@
 import { defineConfig } from "./packages/cli/src/config.ts";
 
-const viaVersionUrl = "https://cdn.modrinth.com/data/P1OZGk5p/versions/ZbFOsGG3/ViaVersion-5.3.1.jar";
-
 const config = defineConfig({
   projectName: "plugin-portal-e2e",
   artifactsDir: "artifacts",
@@ -34,7 +32,7 @@ const config = defineConfig({
     enabled: true,
     provider: "native",
     composeRightPanel: true,
-    panelWidth: 480
+    panelWidth: 560
   },
   topology: {
     preset: "single-paper",
@@ -62,47 +60,31 @@ const config = defineConfig({
       steps: [
         {
           action: "runCommand",
-          value: "/ppm"
+          value: "/pp list"
         },
         {
           action: "delay",
-          delayMs: 1800
+          delayMs: 2200
         },
         {
           action: "runCommand",
-          value: "/ppm version"
+          value: "/pp install ViaVersion HANGAR --byId"
         },
         {
           action: "delay",
-          delayMs: 1800
+          delayMs: 2600
         },
         {
           action: "runCommand",
-          value: "/ppm list"
+          value: "/pp list"
         },
         {
           action: "delay",
-          delayMs: 2000
-        },
-        {
-          action: "runServerCommand",
-          service: "paper-main",
-          command: `pp install-url ${viaVersionUrl}`,
-          console: true
-        },
-        {
-          action: "waitForFile",
-          service: "paper-main",
-          pattern: "plugins/ViaVersion-5.3.1.jar",
-          timeoutMs: 60_000
-        },
-        {
-          action: "delay",
-          delayMs: 2500
+          delayMs: 2600
         },
         {
           action: "takeScreenshot",
-          name: "ppm-demo-screen",
+          name: "pp-install-demo-screen",
           delayMs: 1500,
           openChat: true
         }

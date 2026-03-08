@@ -189,7 +189,7 @@ export function composeRunVideo(
     "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Panel,Menlo,22,&H00F2F2F2,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,1,0,7,${width + 24},24,24,1`,
+    `Style: Panel,Menlo,21,&H00E7E5E4,&H000000FF,&H00131212,&HD0131212,0,0,0,0,100,100,0,0,1,1,0,7,${width + 28},28,28,1`,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
@@ -250,8 +250,8 @@ export function composeRunVideo(
   writeFileSync(assPath, `${sections.join("\n")}\n`, "utf8");
 
   const filter = [
-    `pad=iw+${config.recording.panelWidth}:ih:0:0:0x101820`,
-    `drawbox=x=iw-${config.recording.panelWidth}:y=0:w=${config.recording.panelWidth}:h=ih:color=0x101820@0.92:t=fill`,
+    `pad=iw+${config.recording.panelWidth}:ih:0:0:0x2a2928`,
+    `drawbox=x=iw-${config.recording.panelWidth}:y=0:w=${config.recording.panelWidth}:h=ih:color=0x2a2928@0.96:t=fill`,
     `ass='${assPath.replaceAll("'", "\\'")}'`
   ].join(",");
 
