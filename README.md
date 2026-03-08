@@ -1,21 +1,30 @@
 # Plugin Portal E2E
 
-Visual end-to-end test harness for Plugin Portal using:
+Visual and server-matrix end-to-end harness for Plugin Portal.
 
-- Docker for server and proxy topologies
-- Prism Launcher for real client launches
-- A Kotlin Fabric client mod for client-side automation
-- OBS for raw capture
-- FFmpeg for post-processing
+This repo drives:
 
-## Layout
+- Docker server and proxy topologies
+- real Prism/Fabric client automation
+- screenshot and recording artifacts
+- server-side matrix verification
+- file/log/timeline capture
 
-- `packages/cli`: Bun/TypeScript orchestration
-- `packages/client-mod`: Kotlin Fabric client automation mod
-- `docker`: compose fragments and generated topology assets
-- `scenarios`: reusable scenario definitions
-- `obs`: OBS scene and profile assets
-- `ffmpeg`: video composition assets
+## Status
+
+Working now:
+
+- real Docker validation for `paper`, `purpur`, `pufferfish`, `spigot`
+- real Docker validation for `velocity`, `waterfall`, `bungeecord`
+- server-side command execution through RCON
+- watched-file and log timelines
+- generated run artifacts and matrix summaries
+
+In progress:
+
+- polished client/background lane
+- broader clickable-chat coverage
+- recording polish and background isolation
 
 ## Quick Start
 
@@ -23,16 +32,127 @@ Visual end-to-end test harness for Plugin Portal using:
 bun install
 bun run doctor
 bun run bootstrap
-bun run run:quick-local
+bun run verify:matrix
 ```
+
+## Scripts
+
+```bash
+bun run doctor
+bun run bootstrap
+bun run typecheck
+bun run run:quick-local
+bun run run:quick-prod
+bun run verify:matrix
+bun run e2e verify-matrix --only paper --kind standalone
+bun run e2e verify-matrix --only velocity,waterfall --kind proxy
+```
+
+## Commands
+
+Main entrypoint:
+
+```bash
+bun run e2e <command> [flags]
+```
+
+Supported commands:
+
+- `doctor`
+- `bootstrap`
+- `run`
+- `record`
+- `clean`
+- `verify-matrix`
+
+Important flags:
+
+- `--config <path>`
+- `verify-matrix --only <csv>`
+- `verify-matrix --kind standalone|proxy`
+
+## Config
+
+Default config lives in [e2e.config.ts](/Users/dawson/projects/plugin-portal/plugin-portal-e2e/e2e.config.ts).
+Reference example lives in [e2e.config.example.ts](/Users/dawson/projects/plugin-portal/plugin-portal-e2e/e2e.config.example.ts).
+
+Important config surfaces:
+
+- `apiTarget`
+- `releaseSource`
+- `client`
+- `cleanup`
+- `recording`
+- `topology`
+- `watch`
+- `scenarios`
+
+## Topology Validation
+
+Compose is the final runtime model.
+
+The harness does two separate things:
+
+1. Generate the topology.
+2. Validate that the topology actually works.
+
+Validation means:
+
+- bring the stack up
+- wait for server or proxy readiness
+- execute real commands
+- inspect logs
+- watch filesystem changes
+- export artifacts
+- tear the stack down
+
+That is what `verify-matrix` now does.
+
+## Artifact Layout
+
+Each run creates a new folder under `artifacts/`:
+
+- `screenshots/`
+- `video/`
+- `logs/compose.log`
+- `logs/services/*.log`
+- `data/timeline.jsonl`
+- `data/server-commands.jsonl`
+- `data/resolved-run.json`
+- `data/run-summary.json`
+- `data/file-explorer.svg`
+
+Matrix runs also write:
+
+- `matrix-summary-<timestamp>.json`
 
 ## Local State
 
-Machine-local configuration lives in ignored files:
+Tracked `.env` contains non-secret defaults only.
 
-- `.e2e.local.json`
+Use ignored local files for machine-specific or sensitive overrides:
+
 - `.env.local`
+- `.e2e.local.json`
 - `.obs.local.json`
 
-Do not commit tokens, launcher profiles, account data, or raw artifacts.
+Do not commit:
 
+- account data
+- API tokens
+- OBS auth secrets
+- raw artifacts
+
+## Related Repos
+
+This repo assumes the sibling workspace layout:
+
+- `/Users/dawson/projects/plugin-portal/api`
+- `/Users/dawson/projects/plugin-portal/plugin`
+
+## Current Gaps
+
+- polished client/background isolation on macOS
+- richer clickable-chat scenarios
+- cleaner recording capture and composition defaults
+- future auth/free/premium/version adapter layer

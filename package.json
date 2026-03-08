@@ -11,7 +11,8 @@
     "bootstrap": "bun run packages/cli/src/index.ts bootstrap",
     "typecheck": "tsc --noEmit",
     "run:quick-local": "bun run packages/cli/src/index.ts run --preset quick-local",
-    "run:quick-prod": "bun run packages/cli/src/index.ts run --preset quick-prod"
+    "run:quick-prod": "bun run packages/cli/src/index.ts run --preset quick-prod",
+    "verify:matrix": "bun run packages/cli/src/index.ts verify-matrix"
   },
   "devDependencies": {
     "@types/bun": "^1.3.2",
