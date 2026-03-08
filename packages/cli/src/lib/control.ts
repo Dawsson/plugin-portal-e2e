@@ -10,6 +10,9 @@ export interface ControlRequest {
   path?: string;
   timeoutMs?: number;
   delayMs?: number;
+  visualize?: boolean;
+  beforeDelayMs?: number;
+  afterDelayMs?: number;
   openChat?: boolean;
   afterSequence?: number;
 }

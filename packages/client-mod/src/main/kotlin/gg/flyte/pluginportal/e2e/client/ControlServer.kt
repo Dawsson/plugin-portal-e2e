@@ -98,27 +98,76 @@ class ControlServer(
 
         val client = MinecraftClient.getInstance()
         val afterSequence = ChatCapture.snapshotSequence()
+        val future = CompletableFuture<ControlResponse>()
+        val visualize = request.visualize ?: true
+        val beforeDelayMs = request.beforeDelayMs ?: 500L
+        val afterDelayMs = request.afterDelayMs ?: 900L
+
         client.execute {
-            prepareWorldView(client)
-            val player = client.player ?: return@execute
-            val networkHandler = client.networkHandler ?: return@execute
-            if (command.startsWith("/")) {
-                networkHandler.sendChatCommand(command.removePrefix("/"))
-            } else {
-                networkHandler.sendChatMessage(command)
+            if (client.player == null || client.world == null) {
+                future.complete(
+                    ControlResponse(
+                        id = request.id,
+                        ok = false,
+                        message = "Client is not currently in a world"
+                    )
+                )
+                return@execute
             }
-            PluginPortalE2EClient.logger.info("Dispatched command {}", command)
+
+            prepareWorldView(client)
+
+            executor.submit {
+                if (visualize) {
+                    client.execute {
+                        client.setScreen(ChatScreen(command))
+                    }
+                    Thread.sleep(beforeDelayMs)
+                }
+
+                client.execute {
+                    val networkHandler = client.networkHandler
+                    if (networkHandler == null) {
+                        future.complete(
+                            ControlResponse(
+                                id = request.id,
+                                ok = false,
+                                message = "Missing network handler"
+                            )
+                        )
+                        return@execute
+                    }
+
+                    if (command.startsWith("/")) {
+                        networkHandler.sendChatCommand(command.removePrefix("/"))
+                    } else {
+                        networkHandler.sendChatMessage(command)
+                    }
+                    PluginPortalE2EClient.logger.info("Dispatched command {}", command)
+                }
+
+                Thread.sleep(afterDelayMs)
+
+                client.execute {
+                    if (visualize) {
+                        client.setScreen(ChatScreen(""))
+                    }
+                    future.complete(
+                        ControlResponse(
+                            id = request.id,
+                            ok = true,
+                            message = "Command dispatched",
+                            result = mapOf(
+                                "command" to command,
+                                "afterSequence" to afterSequence.toString()
+                            )
+                        )
+                    )
+                }
+            }
         }
 
-        return ControlResponse(
-            id = request.id,
-            ok = true,
-            message = "Command dispatched",
-            result = mapOf(
-                "command" to command,
-                "afterSequence" to afterSequence.toString()
-            )
-        )
+        return future.get(15, TimeUnit.SECONDS)
     }
 
     private fun connect(request: ControlRequest): ControlResponse {
