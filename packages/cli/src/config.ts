@@ -73,6 +73,17 @@ const stepSchema = z.discriminatedUnion("action", [
     service: z.string(),
     pattern: z.string(),
     timeoutMs: z.number().int().positive().optional()
+  }),
+  z.object({
+    action: z.literal("waitForFile"),
+    service: z.string(),
+    pattern: z.string(),
+    timeoutMs: z.number().int().positive().optional()
+  }),
+  z.object({
+    action: z.literal("assertFileExists"),
+    service: z.string(),
+    path: z.string()
   })
 ]);
 

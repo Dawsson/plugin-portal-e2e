@@ -159,6 +159,7 @@ function waterfallConfig(node: ServerNode): string {
     "  - host: 0.0.0.0:25577",
     `    priorities: [${first}]`,
     "    bind_local_address: true",
+    "    forced_hosts: {}",
     "    ping_passthrough: false",
     "    query_enabled: false",
     "ip_forward: true",

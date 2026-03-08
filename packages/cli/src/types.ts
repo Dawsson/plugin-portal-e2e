@@ -68,7 +68,17 @@ export interface ServerNode {
 }
 
 export interface ScenarioStep {
-  action: "runCommand" | "waitForChat" | "takeScreenshot" | "clickChat" | "delay" | "runServerCommand" | "assertOutputContains" | "waitForServiceLog";
+  action:
+    | "runCommand"
+    | "waitForChat"
+    | "takeScreenshot"
+    | "clickChat"
+    | "delay"
+    | "runServerCommand"
+    | "assertOutputContains"
+    | "waitForServiceLog"
+    | "waitForFile"
+    | "assertFileExists";
   value?: string;
   name?: string;
   text?: string;
@@ -78,6 +88,7 @@ export interface ScenarioStep {
   service?: string;
   command?: string;
   pattern?: string;
+  path?: string;
 }
 
 export interface Scenario {

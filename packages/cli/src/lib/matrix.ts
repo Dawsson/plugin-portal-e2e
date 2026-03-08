@@ -1,5 +1,69 @@
 import type { E2EConfig } from "../types.ts";
 
+function standaloneScenarios(family: "paper" | "purpur" | "pufferfish" | "spigot") {
+  return [
+    {
+      id: "server-smoke",
+      kind: "scripted" as const,
+      steps: [
+        {
+          action: "runServerCommand" as const,
+          service: `${family}-main`,
+          command: "plugins"
+        },
+        {
+          action: "assertOutputContains" as const,
+          value: "PluginPortal"
+        },
+        {
+          action: "delay" as const,
+          delayMs: 500
+        },
+        {
+          action: "runServerCommand" as const,
+          service: `${family}-main`,
+          command: "pp version"
+        },
+        {
+          action: "delay" as const,
+          delayMs: 500
+        },
+        {
+          action: "runServerCommand" as const,
+          service: `${family}-main`,
+          command: "pp info"
+        },
+        {
+          action: "delay" as const,
+          delayMs: 500
+        },
+        {
+          action: "runServerCommand" as const,
+          service: `${family}-main`,
+          command: "pp list"
+        }
+      ]
+    },
+    {
+      id: "install-smoke",
+      kind: "scripted" as const,
+      steps: [
+        {
+          action: "runServerCommand" as const,
+          service: `${family}-main`,
+          command: "pp install ViaVersion HANGAR --exact"
+        },
+        {
+          action: "waitForFile" as const,
+          service: `${family}-main`,
+          pattern: "plugins/*ViaVersion*.jar",
+          timeoutMs: 120_000
+        }
+      ]
+    }
+  ];
+}
+
 export function buildMatrixConfigs(base: E2EConfig): E2EConfig[] {
   const standaloneFamilies = ["paper", "purpur", "pufferfish", "spigot"] as const;
   const proxyFamilies = ["velocity", "waterfall", "bungeecord"] as const;
@@ -26,33 +90,7 @@ export function buildMatrixConfigs(base: E2EConfig): E2EConfig[] {
         }
       ]
     },
-    scenarios: [
-      {
-        id: "version",
-        kind: "scripted" as const,
-        steps: [
-          {
-            action: "runServerCommand" as const,
-            service: `${family}-main`,
-            command: "plugins"
-          },
-          {
-            action: "assertOutputContains" as const,
-            value: "PluginPortal"
-          },
-          {
-            action: "runServerCommand" as const,
-            service: `${family}-main`,
-            command: "pp version"
-          },
-          {
-            action: "runServerCommand" as const,
-            service: `${family}-main`,
-            command: "pp list"
-          }
-        ]
-      }
-    ]
+    scenarios: standaloneScenarios(family)
   }));
 
   const proxied = proxyFamilies.map((family) => ({
@@ -86,6 +124,22 @@ export function buildMatrixConfigs(base: E2EConfig): E2EConfig[] {
     },
     scenarios: [
       {
+        id: "proxy-ready",
+        kind: "scripted" as const,
+        steps: [
+          {
+            action: "waitForServiceLog" as const,
+            service: "proxy-main",
+            pattern: family === "velocity" ? "Listening on" : "Listening on /0.0.0.0:25577",
+            timeoutMs: 60_000
+          },
+          {
+            action: "delay" as const,
+            delayMs: 500
+          }
+        ]
+      },
+      {
         id: "proxy-backend-version",
         kind: "scripted" as const,
         steps: [
@@ -97,6 +151,10 @@ export function buildMatrixConfigs(base: E2EConfig): E2EConfig[] {
           {
             action: "assertOutputContains" as const,
             value: "PluginPortal"
+          },
+          {
+            action: "delay" as const,
+            delayMs: 500
           },
           {
             action: "runServerCommand" as const,
