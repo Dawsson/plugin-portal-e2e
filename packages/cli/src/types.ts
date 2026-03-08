@@ -82,7 +82,10 @@ export interface ScenarioStep {
     | "waitForServiceLog"
     | "waitForFile"
     | "waitForFileChange"
-    | "assertFileExists";
+    | "waitForFileContains"
+    | "assertFileExists"
+    | "assertFileContains"
+    | "restartService";
   value?: string;
   name?: string;
   text?: string;
@@ -91,6 +94,7 @@ export interface ScenarioStep {
   openChat?: boolean;
   service?: string;
   command?: string;
+  console?: boolean;
   pattern?: string;
   path?: string;
 }

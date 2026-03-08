@@ -1,11 +1,11 @@
 import { appendFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { ArtifactPaths } from "./artifacts.ts";
 import type { E2EConfig } from "../types.ts";
 import type { TimelineWriter } from "./timeline.ts";
-import { runRconCommand } from "./rcon.ts";
-import { waitForServiceLog } from "./docker.ts";
+import { runConsoleCommand, runRconCommand } from "./rcon.ts";
+import { dockerComposeRestart, waitForServiceLog } from "./docker.ts";
 
 function runtimeRootForService(root: string, service: string): string {
   return resolve(root, ".state/runtime", service);
@@ -57,6 +57,30 @@ async function waitForRuntimeFileChange(root: string, service: string, pattern: 
   throw new Error(`Timed out waiting for file change ${service}:${pattern}`);
 }
 
+async function waitForRuntimeFileContains(
+  root: string,
+  service: string,
+  relPath: string,
+  value: string,
+  timeoutMs: number
+): Promise<void> {
+  const fullPath = join(runtimeRootForService(root, service), relPath);
+  const needle = value.toLowerCase();
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    if (existsSync(fullPath)) {
+      const text = readFileSync(fullPath, "utf8");
+      if (text.toLowerCase().includes(needle)) {
+        return;
+      }
+    }
+    await Bun.sleep(500);
+  }
+
+  throw new Error(`Timed out waiting for ${service}:${relPath} to contain "${value}"`);
+}
+
 export async function runServerScenarios(
   root: string,
   composePath: string,
@@ -91,7 +115,9 @@ export async function runServerScenarios(
       }
 
       if (step.action === "runServerCommand") {
-        lastOutput = runRconCommand(composePath, root, step.service ?? "paper-main", step.command ?? "");
+        lastOutput = step.console
+          ? runConsoleCommand(composePath, root, step.service ?? "paper-main", step.command ?? "")
+          : runRconCommand(composePath, root, step.service ?? "paper-main", step.command ?? "");
         await appendFile(
           transcriptPath,
           `${JSON.stringify({
@@ -99,6 +125,7 @@ export async function runServerScenarios(
             stepIndex: index,
             service: step.service ?? "paper-main",
             command: step.command ?? "",
+            console: step.console ?? false,
             output: lastOutput
           })}\n`,
           "utf8"
@@ -111,6 +138,7 @@ export async function runServerScenarios(
           ok: true,
           service: step.service,
           command: step.command,
+          console: step.console ?? false,
           output: lastOutput
         });
         continue;
@@ -156,6 +184,27 @@ export async function runServerScenarios(
         continue;
       }
 
+      if (step.action === "waitForFileContains") {
+        await waitForRuntimeFileContains(
+          root,
+          step.service ?? "paper-main",
+          step.path ?? "",
+          step.value ?? "",
+          step.timeoutMs ?? 60_000
+        );
+        timeline.write({
+          type: "scenario.step.finished",
+          scenario: scenario.id,
+          stepIndex: index,
+          action: step.action,
+          ok: true,
+          service: step.service,
+          path: step.path,
+          value: step.value
+        });
+        continue;
+      }
+
       if (step.action === "assertFileExists") {
         const fullPath = join(runtimeRootForService(root, step.service ?? "paper-main"), step.path ?? "");
         if (!existsSync(fullPath)) {
@@ -169,6 +218,28 @@ export async function runServerScenarios(
           ok: true,
           service: step.service,
           path: step.path
+        });
+        continue;
+      }
+
+      if (step.action === "assertFileContains") {
+        const fullPath = join(runtimeRootForService(root, step.service ?? "paper-main"), step.path ?? "");
+        if (!existsSync(fullPath)) {
+          throw new Error(`Expected file to exist: ${fullPath}`);
+        }
+        const text = readFileSync(fullPath, "utf8");
+        if (!text.toLowerCase().includes((step.value ?? "").toLowerCase())) {
+          throw new Error(`Expected ${fullPath} to contain "${step.value}"`);
+        }
+        timeline.write({
+          type: "scenario.step.finished",
+          scenario: scenario.id,
+          stepIndex: index,
+          action: step.action,
+          ok: true,
+          service: step.service,
+          path: step.path,
+          value: step.value
         });
         continue;
       }
@@ -204,6 +275,34 @@ export async function runServerScenarios(
           ok: true,
           service: step.service,
           pattern: step.pattern
+        });
+        continue;
+      }
+
+      if (step.action === "restartService") {
+        const service = step.service ?? "paper-main";
+        dockerComposeRestart(composePath, root, service);
+        await waitForServiceLog(
+          composePath,
+          root,
+          service,
+          /Done \([^)]+\)! For help, type "help"/,
+          step.timeoutMs ?? 180_000
+        );
+        await waitForServiceLog(
+          composePath,
+          root,
+          service,
+          /RCON running on 0\.0\.0\.0:25575/,
+          30_000
+        );
+        timeline.write({
+          type: "scenario.step.finished",
+          scenario: scenario.id,
+          stepIndex: index,
+          action: step.action,
+          ok: true,
+          service
         });
         continue;
       }

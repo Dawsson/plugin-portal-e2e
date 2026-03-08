@@ -62,7 +62,8 @@ const stepSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("runServerCommand"),
     service: z.string(),
-    command: z.string()
+    command: z.string(),
+    console: z.boolean().optional()
   }),
   z.object({
     action: z.literal("assertOutputContains"),
@@ -87,9 +88,27 @@ const stepSchema = z.discriminatedUnion("action", [
     timeoutMs: z.number().int().positive().optional()
   }),
   z.object({
+    action: z.literal("waitForFileContains"),
+    service: z.string(),
+    path: z.string(),
+    value: z.string(),
+    timeoutMs: z.number().int().positive().optional()
+  }),
+  z.object({
     action: z.literal("assertFileExists"),
     service: z.string(),
     path: z.string()
+  }),
+  z.object({
+    action: z.literal("assertFileContains"),
+    service: z.string(),
+    path: z.string(),
+    value: z.string()
+  }),
+  z.object({
+    action: z.literal("restartService"),
+    service: z.string(),
+    timeoutMs: z.number().int().positive().optional()
   })
 ]);
 

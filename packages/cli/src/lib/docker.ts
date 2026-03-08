@@ -57,6 +57,7 @@ function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRe
     "      DIFFICULTY: peaceful",
     `      OPS: ${operator}`,
     "      ENABLE_RCON: \"TRUE\"",
+    "      CREATE_CONSOLE_IN_PIPE: \"TRUE\"",
     "      RCON_PASSWORD: \"plugin-portal-e2e\"",
     "      MEMORY: 2G"
   ];
@@ -222,6 +223,13 @@ export function dockerComposeDown(composePath: string, root: string, wipeVolumes
   const result = runCommand(args, root);
   if (!result.ok) {
     throw new Error(`docker compose down failed\n${result.stderr}`);
+  }
+}
+
+export function dockerComposeRestart(composePath: string, root: string, service: string): void {
+  const result = runCommand(["docker", "compose", "-f", composePath, "restart", service], root);
+  if (!result.ok) {
+    throw new Error(`docker compose restart failed for ${service}\n${result.stderr}`);
   }
 }
 

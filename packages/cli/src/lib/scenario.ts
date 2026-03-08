@@ -3,8 +3,8 @@ import { appendFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { ArtifactPaths } from "./artifacts.ts";
 import { sendControlRequest } from "./control.ts";
-import { waitForServiceLog } from "./docker.ts";
-import { runRconCommand } from "./rcon.ts";
+import { dockerComposeRestart, waitForServiceLog } from "./docker.ts";
+import { runConsoleCommand, runRconCommand } from "./rcon.ts";
 import type { E2EConfig } from "../types.ts";
 
 function runtimeRootForService(root: string, service: string): string {
@@ -183,7 +183,9 @@ export async function runScenarios(
         if (!context.root || !context.composePath) {
           throw new Error("runServerCommand requires a server-backed run context");
         }
-        lastServerOutput = runRconCommand(context.composePath, context.root, step.service ?? "paper-main", step.command ?? "");
+        lastServerOutput = step.console
+          ? runConsoleCommand(context.composePath, context.root, step.service ?? "paper-main", step.command ?? "")
+          : runRconCommand(context.composePath, context.root, step.service ?? "paper-main", step.command ?? "");
         await appendFile(
           serverTranscriptPath,
           `${JSON.stringify({
@@ -191,6 +193,7 @@ export async function runScenarios(
             stepIndex: index,
             service: step.service ?? "paper-main",
             command: step.command ?? "",
+            console: step.console ?? false,
             output: lastServerOutput
           })}\n`,
           "utf8"
@@ -202,6 +205,7 @@ export async function runScenarios(
           ok: true,
           service: step.service,
           command: step.command,
+          console: step.console ?? false,
           output: lastServerOutput
         });
         continue;
@@ -239,6 +243,36 @@ export async function runScenarios(
           ok: true,
           service: step.service,
           pattern: step.pattern
+        });
+        continue;
+      }
+
+      if (step.action === "restartService") {
+        if (!context.root || !context.composePath) {
+          throw new Error("restartService requires a server-backed run context");
+        }
+        const service = step.service ?? "paper-main";
+        dockerComposeRestart(context.composePath, context.root, service);
+        await waitForServiceLog(
+          context.composePath,
+          context.root,
+          service,
+          /Done \([^)]+\)! For help, type "help"/,
+          step.timeoutMs ?? 180_000
+        );
+        await waitForServiceLog(
+          context.composePath,
+          context.root,
+          service,
+          /RCON running on 0\.0\.0\.0:25575/,
+          30_000
+        );
+        hooks.onStepFinished?.({
+          scenario: scenario.id,
+          stepIndex: index,
+          action: step.action,
+          ok: true,
+          service
         });
         continue;
       }
