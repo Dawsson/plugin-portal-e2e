@@ -31,7 +31,9 @@ bun run bootstrap
 bun run verify
 bun run run:quick-local
 bun run run:quick-prod
+bun run run:proxy-local
 bun run verify:matrix
+bun run verify:velocity-two-paper
 bun run e2e verify-matrix --only paper --kind standalone
 bun run e2e verify-matrix --only velocity,waterfall --kind proxy
 ```
@@ -57,8 +59,18 @@ Commands:
 Useful flags:
 
 - `--config <path>` loads a specific config file
+- `--preset <name>` applies a built-in topology/api preset
 - `verify-matrix --only <csv>` filters by family, project name, or service id
 - `verify-matrix --kind standalone|proxy` filters the matrix by topology class
+
+Built-in presets:
+
+- `quick-local`
+- `quick-prod`
+- `proxy-local`
+- `velocity-two-paper`
+- `waterfall-two-paper`
+- `bungeecord-two-paper`
 
 ## Custom Topologies
 
@@ -99,6 +111,12 @@ Matrix runs also emit:
 
 - `artifacts/matrix-summary-<timestamp>.json`
 
+The matrix now covers:
+
+- standalone server families
+- one-proxy/one-backend topologies
+- one-proxy/two-backend Paper topologies
+
 ## Scenario Model
 
 Client-backed scenarios use steps like:
@@ -115,7 +133,10 @@ Server-only scenarios use steps like:
 - `assertOutputContains`
 - `waitForServiceLog`
 - `waitForFile`
+- `waitForFileContains`
 - `assertFileExists`
+- `assertFileContains`
+- `restartService`
 
 When extending scenario coverage, prefer assertions tied to real server effects:
 

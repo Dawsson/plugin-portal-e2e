@@ -6,6 +6,7 @@ import { runPreset } from "./commands/run.ts";
 import { verifyConfig, verifyMatrix } from "./commands/verify.ts";
 import { loadConfig } from "./lib/config.ts";
 import { loadEnvFiles } from "./lib/env.ts";
+import { applyPreset } from "./lib/presets.ts";
 
 function readFlag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -31,7 +32,39 @@ async function main(): Promise<void> {
   loadEnvFiles(root);
   const args = Bun.argv.slice(2);
   const command = args[0] ?? "doctor";
-  const config = await loadConfig(root, readFlag(args, "--config"));
+  const preset = readFlag(args, "--preset");
+  const config = applyPreset(await loadConfig(root, readFlag(args, "--config")), preset, command);
+
+  if (command === "help" || args.includes("--help")) {
+    console.log([
+      "Plugin Portal E2E",
+      "",
+      "Usage:",
+      "  bun run e2e <command> [--config <path>] [--preset <name>]",
+      "",
+      "Commands:",
+      "  doctor",
+      "  bootstrap",
+      "  run",
+      "  record",
+      "  clean",
+      "  verify",
+      "  verify-matrix",
+      "",
+      "Presets:",
+      "  quick-local",
+      "  quick-prod",
+      "  proxy-local",
+      "  velocity-two-paper",
+      "  waterfall-two-paper",
+      "  bungeecord-two-paper",
+      "",
+      "Matrix flags:",
+      "  --only <csv>",
+      "  --kind standalone|proxy"
+    ].join("\n"));
+    return;
+  }
 
   switch (command) {
     case "doctor":

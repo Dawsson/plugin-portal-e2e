@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import type { E2EConfig, ServerFamily } from "../types.ts";
+import type { E2EConfig, ProxyFamily, ServerFamily } from "../types.ts";
 import { getArtifactPaths } from "../lib/artifacts.ts";
 import { dockerComposeDown, dockerComposeUp, waitForServiceLog, writeComposeFile } from "../lib/docker.ts";
 import { resolveReleaseSource } from "../lib/release.ts";
@@ -16,6 +16,20 @@ import { waitForPort } from "../lib/wait.ts";
 
 function isBackendFamily(family: string): family is ServerFamily {
   return family === "paper" || family === "purpur" || family === "pufferfish" || family === "spigot";
+}
+
+function isProxyFamily(family: string): family is ProxyFamily {
+  return family === "velocity" || family === "waterfall" || family === "bungeecord";
+}
+
+function proxyReadyPattern(family: ProxyFamily): RegExp {
+  switch (family) {
+    case "velocity":
+      return /Listening on/;
+    case "waterfall":
+    case "bungeecord":
+      return /Listening on \/0\.0\.0\.0:25577/;
+  }
 }
 
 function cleanServerRuntime(root: string, config: E2EConfig): void {
@@ -66,12 +80,24 @@ async function verifySingle(root: string, config: E2EConfig): Promise<{ projectN
     composeLogs = startComposeLogCapture(composePath, root, artifacts, timeline);
     runtimeWatchers = await startRuntimeWatchers(root, config, timeline);
 
-    const primaryBackend = config.topology.servers.find((server) => isBackendFamily(server.family));
-    if (!primaryBackend) {
+    const backends = config.topology.servers.filter((server) => isBackendFamily(server.family));
+    if (backends.length === 0) {
       throw new Error("No backend server is configured");
     }
 
-    await waitForServiceLog(composePath, root, primaryBackend.id, /Done \([^)]+\)! For help, type "help"/, 180_000);
+    for (const backend of backends) {
+      await waitForServiceLog(composePath, root, backend.id, /Done \([^)]+\)! For help, type "help"/, 180_000);
+    }
+
+    const proxies = config.topology.servers.filter(
+      (
+        server
+      ): server is E2EConfig["topology"]["servers"][number] & { family: ProxyFamily } => isProxyFamily(server.family)
+    );
+    for (const proxy of proxies) {
+      await waitForServiceLog(composePath, root, proxy.id, proxyReadyPattern(proxy.family), 60_000);
+    }
+
     await waitForPort("127.0.0.1", 25565, 30_000);
     await runServerScenarios(root, composePath, config, artifacts, timeline);
     timeline.write({ type: "run.finished", ok: true });

@@ -306,6 +306,8 @@ export async function runServerScenarios(
         });
         continue;
       }
+
+      throw new Error(`Unsupported server-only scenario action: ${step.action}`);
     }
   }
 }

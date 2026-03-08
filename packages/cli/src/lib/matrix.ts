@@ -5,6 +5,8 @@ export interface MatrixSelection {
   kind?: "all" | "standalone" | "proxy";
 }
 
+const viaVersionUrl = "https://cdn.modrinth.com/data/P1OZGk5p/versions/ZbFOsGG3/ViaVersion-5.3.1.jar";
+
 function standaloneScenarios(family: "paper" | "purpur" | "pufferfish" | "spigot") {
   return [
     {
@@ -46,25 +48,93 @@ function standaloneScenarios(family: "paper" | "purpur" | "pufferfish" | "spigot
           action: "runServerCommand" as const,
           service: `${family}-main`,
           command: "pp list"
-        }
-      ]
-    },
-    {
-      id: "install-smoke",
-      kind: "scripted" as const,
-      steps: [
+        },
+        {
+          action: "delay" as const,
+          delayMs: 500
+        },
         {
           action: "runServerCommand" as const,
           service: `${family}-main`,
-          command: "pp install ViaVersion HANGAR --exact"
+          command: "pp install-url " + viaVersionUrl,
+          console: true
         },
         {
           action: "waitForFile" as const,
           service: `${family}-main`,
-          pattern: "plugins/*ViaVersion*.jar",
+          pattern: "plugins/ViaVersion-5.3.1.jar",
           timeoutMs: 120_000
+        },
+        {
+          action: "restartService" as const,
+          service: `${family}-main`,
+          timeoutMs: 180_000
+        },
+        {
+          action: "waitForFile" as const,
+          service: `${family}-main`,
+          pattern: "plugins/ViaVersion/config.yml",
+          timeoutMs: 60_000
+        },
+        {
+          action: "assertFileContains" as const,
+          service: `${family}-main`,
+          path: "plugins/ViaVersion/config.yml",
+          value: "check-for-updates: true"
         }
       ]
+    }
+  ];
+}
+
+function proxyScenarios(proxyId: string, family: "velocity" | "waterfall" | "bungeecord", backends: string[]) {
+  const readyPattern = family === "velocity" ? "Listening on" : "Listening on /0.0.0.0:25577";
+  const backendChecks = backends.flatMap((service) => ([
+    {
+      action: "runServerCommand" as const,
+      service,
+      command: "plugins"
+    },
+    {
+      action: "assertOutputContains" as const,
+      value: "PluginPortal"
+    },
+    {
+      action: "delay" as const,
+      delayMs: 500
+    },
+    {
+      action: "runServerCommand" as const,
+      service,
+      command: "pp version"
+    },
+    {
+      action: "delay" as const,
+      delayMs: 500
+    }
+  ]));
+
+  return [
+    {
+      id: "proxy-ready",
+      kind: "scripted" as const,
+      steps: [
+        {
+          action: "waitForServiceLog" as const,
+          service: proxyId,
+          pattern: readyPattern,
+          timeoutMs: 60_000
+        },
+        {
+          action: "delay" as const,
+          delayMs: 500
+        }
+      ]
+    },
+    {
+      id: "proxy-backends",
+      kind: "scripted" as const,
+      steps: backendChecks
     }
   ];
 }
@@ -98,7 +168,7 @@ export function buildMatrixConfigs(base: E2EConfig, selection: MatrixSelection =
     scenarios: standaloneScenarios(family)
   }));
 
-  const proxied = proxyFamilies.map((family) => ({
+  const proxiedSingle = proxyFamilies.map((family) => ({
     ...base,
     projectName: `${base.projectName}-${family}`,
     recording: {
@@ -127,53 +197,50 @@ export function buildMatrixConfigs(base: E2EConfig, selection: MatrixSelection =
         }
       ]
     },
-    scenarios: [
-      {
-        id: "proxy-ready",
-        kind: "scripted" as const,
-        steps: [
-          {
-            action: "waitForServiceLog" as const,
-            service: "proxy-main",
-            pattern: family === "velocity" ? "Listening on" : "Listening on /0.0.0.0:25577",
-            timeoutMs: 60_000
-          },
-          {
-            action: "delay" as const,
-            delayMs: 500
-          }
-        ]
-      },
-      {
-        id: "proxy-backend-version",
-        kind: "scripted" as const,
-        steps: [
-          {
-            action: "runServerCommand" as const,
-            service: "paper-main",
-            command: "plugins"
-          },
-          {
-            action: "assertOutputContains" as const,
-            value: "PluginPortal"
-          },
-          {
-            action: "delay" as const,
-            delayMs: 500
-          },
-          {
-            action: "runServerCommand" as const,
-            service: "paper-main",
-            command: "pp version"
-          }
-        ]
-      }
-    ]
+    scenarios: proxyScenarios("proxy-main", family, ["paper-main"])
+  }));
+
+  const proxiedDouble = proxyFamilies.map((family) => ({
+    ...base,
+    projectName: `${base.projectName}-${family}-two-paper`,
+    recording: {
+      ...base.recording,
+      enabled: false,
+      provider: "none" as const
+    },
+    cleanup: {
+      ...base.cleanup,
+      closeClient: false
+    },
+    topology: {
+      preset: "custom" as const,
+      servers: [
+        {
+          id: "paper-lobby",
+          family: "paper" as const,
+          version: "1.21.4"
+        },
+        {
+          id: "paper-admin",
+          family: "paper" as const,
+          version: "1.21.4"
+        },
+        {
+          id: `${family}-main`,
+          family,
+          version: "latest",
+          backends: ["paper-lobby", "paper-admin"],
+          forwardingMode: "legacy" as const
+        }
+      ]
+    },
+    scenarios: proxyScenarios(`${family}-main`, family, ["paper-lobby", "paper-admin"])
   }));
 
   const candidates = [
     ...(selection.kind === "proxy" ? [] : standalone),
-    ...(selection.kind === "standalone" ? [] : proxied)
+    ...(selection.kind === "standalone" ? [] : proxiedSingle),
+    ...(selection.kind === "standalone" ? [] : proxiedDouble)
   ];
 
   const only = selection.only;

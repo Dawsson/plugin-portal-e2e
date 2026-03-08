@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { appendFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { ArtifactPaths } from "./artifacts.ts";
@@ -55,6 +55,30 @@ async function waitForRuntimeFileChange(root: string, service: string, pattern: 
   }
 
   throw new Error(`Timed out waiting for file change ${service}:${pattern}`);
+}
+
+async function waitForRuntimeFileContains(
+  root: string,
+  service: string,
+  relPath: string,
+  value: string,
+  timeoutMs: number
+): Promise<void> {
+  const fullPath = join(runtimeRootForService(root, service), relPath);
+  const needle = value.toLowerCase();
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    if (existsSync(fullPath)) {
+      const text = readFileSync(fullPath, "utf8");
+      if (text.toLowerCase().includes(needle)) {
+        return;
+      }
+    }
+    await Bun.sleep(500);
+  }
+
+  throw new Error(`Timed out waiting for ${service}:${relPath} to contain "${value}"`);
 }
 
 export async function runScenarios(
@@ -321,6 +345,29 @@ export async function runScenarios(
         continue;
       }
 
+      if (step.action === "waitForFileContains") {
+        if (!context.root) {
+          throw new Error("waitForFileContains requires a server-backed run context");
+        }
+        await waitForRuntimeFileContains(
+          context.root,
+          step.service ?? "paper-main",
+          step.path ?? "",
+          step.value ?? "",
+          step.timeoutMs ?? 60_000
+        );
+        hooks.onStepFinished?.({
+          scenario: scenario.id,
+          stepIndex: index,
+          action: step.action,
+          ok: true,
+          service: step.service,
+          path: step.path,
+          value: step.value
+        });
+        continue;
+      }
+
       if (step.action === "assertFileExists") {
         if (!context.root) {
           throw new Error("assertFileExists requires a server-backed run context");
@@ -337,7 +384,34 @@ export async function runScenarios(
           service: step.service,
           path: step.path
         });
+        continue;
       }
+
+      if (step.action === "assertFileContains") {
+        if (!context.root) {
+          throw new Error("assertFileContains requires a server-backed run context");
+        }
+        const fullPath = join(runtimeRootForService(context.root, step.service ?? "paper-main"), step.path ?? "");
+        if (!existsSync(fullPath)) {
+          throw new Error(`Expected file to exist: ${fullPath}`);
+        }
+        const text = readFileSync(fullPath, "utf8");
+        if (!text.toLowerCase().includes((step.value ?? "").toLowerCase())) {
+          throw new Error(`Expected ${fullPath} to contain "${step.value}"`);
+        }
+        hooks.onStepFinished?.({
+          scenario: scenario.id,
+          stepIndex: index,
+          action: step.action,
+          ok: true,
+          service: step.service,
+          path: step.path,
+          value: step.value
+        });
+        continue;
+      }
+
+      throw new Error(`Unsupported scenario action: ${step.action}`);
     }
   }
 }

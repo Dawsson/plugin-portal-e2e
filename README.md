@@ -42,9 +42,12 @@ bun run doctor
 bun run bootstrap
 bun run verify
 bun run typecheck
+bun run e2e help
 bun run run:quick-local
 bun run run:quick-prod
+bun run run:proxy-local
 bun run verify:matrix
+bun run verify:velocity-two-paper
 bun run e2e verify-matrix --only paper --kind standalone
 bun run e2e verify-matrix --only velocity,waterfall --kind proxy
 ```
@@ -70,8 +73,18 @@ Supported commands:
 Important flags:
 
 - `--config <path>`
+- `--preset <name>`
 - `verify-matrix --only <csv>`
 - `verify-matrix --kind standalone|proxy`
+
+Built-in presets:
+
+- `quick-local`
+- `quick-prod`
+- `proxy-local`
+- `velocity-two-paper`
+- `waterfall-two-paper`
+- `bungeecord-two-paper`
 
 ## Custom Topologies
 
@@ -91,6 +104,13 @@ Helper builders are exported from [config.ts](/Users/dawson/projects/plugin-port
 - `createProxyTopology`
 
 The two-backend proxy example lives in [e2e.config.proxy-two-paper.example.ts](/Users/dawson/projects/plugin-portal/plugin-portal-e2e/e2e.config.proxy-two-paper.example.ts).
+
+You can also use presets for the most common operator flows without editing config:
+
+```bash
+bun run e2e verify --preset velocity-two-paper
+bun run e2e run --preset proxy-local
+```
 
 ## Config
 
@@ -138,6 +158,12 @@ Validation means:
 - tear the stack down
 
 That is what `verify-matrix` now does.
+
+The matrix now includes:
+
+- standalone `paper`, `purpur`, `pufferfish`, `spigot`
+- single-backend `velocity`, `waterfall`, `bungeecord`
+- two-backend proxy topologies for `velocity`, `waterfall`, `bungeecord`
 
 ## Artifact Layout
 

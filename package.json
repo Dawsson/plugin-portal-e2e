@@ -12,8 +12,10 @@
     "typecheck": "tsc --noEmit",
     "run:quick-local": "bun run packages/cli/src/index.ts run --preset quick-local",
     "run:quick-prod": "bun run packages/cli/src/index.ts run --preset quick-prod",
+    "run:proxy-local": "bun run packages/cli/src/index.ts run --preset proxy-local",
     "verify": "bun run packages/cli/src/index.ts verify",
-    "verify:matrix": "bun run packages/cli/src/index.ts verify-matrix"
+    "verify:matrix": "bun run packages/cli/src/index.ts verify-matrix",
+    "verify:velocity-two-paper": "bun run packages/cli/src/index.ts verify --preset velocity-two-paper"
   },
   "devDependencies": {
     "@types/bun": "^1.3.2",
