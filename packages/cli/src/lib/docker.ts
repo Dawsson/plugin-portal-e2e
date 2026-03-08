@@ -58,6 +58,9 @@ function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRe
     `      OPS: ${operator}`,
     "      MEMORY: 2G"
   ];
+  if (config.topology.servers.some((candidate) => isProxyFamily(candidate.family) && (candidate.backends ?? []).includes(node.id))) {
+    environment.push("      OVERRIDE_SERVER_PROPERTIES: true");
+  }
   if (config.apiTarget.mode !== "production") {
     environment.push(`      JVM_DD_OPTS: -Dpluginportal.baseUrl=${config.apiTarget.baseUrl} -Dpluginportal.wsBaseUrl=${config.apiTarget.baseUrl.replace("https://", "wss://").replace("http://", "ws://")}`)
   }
@@ -76,29 +79,113 @@ function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRe
   ].join("\n");
 }
 
-function proxyService(node: ServerNode): string {
+function proxyService(root: string, config: E2EConfig, node: ServerNode): string {
   if (!isProxyFamily(node.family)) {
     throw new Error(`Expected proxy family, received ${node.family}`);
   }
+  const configMount = proxyConfigDir(root, config.projectName, node.id);
   return [
     `  ${node.id}:`,
     "    image: itzg/mc-proxy:latest",
     "    environment:",
     `      TYPE: ${proxyTypeFor(node.family)}`,
     "      ONLINE_MODE: \"FALSE\"",
+    "      REPLACE_ENV_VARIABLES: \"TRUE\"",
     "    ports:",
-    "      - \"25577:25577\""
+    ...(node.family === "velocity" ? ["      - \"25565:25565\""] : ["      - \"25565:25577\""]),
+    "    volumes:",
+    `      - ${configMount}:/config:ro`
   ].join("\n");
 }
 
-export function generateComposeYaml(config: E2EConfig, release: ResolvedRelease): string {
+function proxyConfigDir(root: string, projectName: string, nodeId: string): string {
+  return resolve(root, ".state/generated", projectName, "proxy", nodeId, "config");
+}
+
+function writeBackendProxyConfig(root: string, config: E2EConfig): void {
+  const proxiedBackends = new Set(
+    config.topology.servers
+      .filter((node) => isProxyFamily(node.family))
+      .flatMap((node) => node.backends ?? [])
+  );
+
+  for (const backend of config.topology.servers) {
+    if (!isServerFamily(backend.family) || !proxiedBackends.has(backend.id)) {
+      continue;
+    }
+
+    const runtimeRoot = resolve(root, ".state/runtime", backend.id);
+    ensureDir(runtimeRoot);
+    const spigotConfig = [
+      "settings:",
+      "  bungeecord: true"
+    ].join("\n");
+    Bun.write(join(runtimeRoot, "spigot.yml"), `${spigotConfig}\n`);
+  }
+}
+
+function velocityConfig(node: ServerNode): string {
+  const backends = node.backends ?? [];
+  const first = backends[0] ?? "";
+  const servers = backends
+    .map((backend) => `  ${backend} = "${backend}:25565"`)
+    .join("\n");
+
+  return [
+    `bind = "0.0.0.0:25565"`,
+    'motd = "Plugin Portal E2E"',
+    "online-mode = false",
+    `player-info-forwarding-mode = "${node.forwardingMode ?? "legacy"}"`,
+    "",
+    "[servers]",
+    servers,
+    "",
+    `try = ["${first}"]`
+  ].join("\n");
+}
+
+function waterfallConfig(node: ServerNode): string {
+  const backends = node.backends ?? [];
+  const first = backends[0] ?? "";
+  const servers = backends
+    .map((backend) => `  ${backend}:\n    address: ${backend}:25565\n    motd: '${backend}'\n    restricted: false`)
+    .join("\n");
+
+  return [
+    "listeners:",
+    "  - host: 0.0.0.0:25577",
+    `    priorities: [${first}]`,
+    "    bind_local_address: true",
+    "    ping_passthrough: false",
+    "    query_enabled: false",
+    "ip_forward: true",
+    "online_mode: false",
+    "servers:",
+    servers
+  ].join("\n");
+}
+
+function writeProxyConfigs(root: string, config: E2EConfig): void {
+  for (const node of config.topology.servers) {
+    if (!isProxyFamily(node.family)) {
+      continue;
+    }
+    const dir = proxyConfigDir(root, config.projectName, node.id);
+    ensureDir(dir);
+    const filename = node.family === "velocity" ? "velocity.toml" : "config.yml";
+    const contents = node.family === "velocity" ? velocityConfig(node) : waterfallConfig(node);
+    Bun.write(join(dir, filename), `${contents}\n`);
+  }
+}
+
+export function generateComposeYaml(root: string, config: E2EConfig, release: ResolvedRelease): string {
   const services: string[] = [];
   const hasProxy = config.topology.servers.some((server) => isProxyFamily(server.family));
   for (const [index, server] of config.topology.servers.entries()) {
     if (isServerFamily(server.family)) {
       services.push(backendService(server, config, release, !hasProxy && index === 0));
     } else if (isProxyFamily(server.family)) {
-      services.push(proxyService(server));
+      services.push(proxyService(root, config, server));
     }
   }
   return [
@@ -111,8 +198,10 @@ export function writeComposeFile(root: string, config: E2EConfig, release: Resol
   const stateRoot = resolve(root, ".state/generated", config.projectName);
   ensureDir(stateRoot);
   ensureDir(resolve(root, ".state/runtime"));
+  writeBackendProxyConfig(root, config);
+  writeProxyConfigs(root, config);
   const composePath = join(stateRoot, "docker-compose.yml");
-  Bun.write(composePath, `${generateComposeYaml(config, release)}\n`);
+  Bun.write(composePath, `${generateComposeYaml(root, config, release)}\n`);
   return composePath;
 }
 

@@ -63,6 +63,8 @@ export interface ServerNode {
   id: string;
   family: ServerFamily | ProxyFamily;
   version: string;
+  backends?: string[];
+  forwardingMode?: "modern" | "legacy";
 }
 
 export interface ScenarioStep {

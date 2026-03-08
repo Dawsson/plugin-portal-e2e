@@ -36,6 +36,13 @@ export default defineConfig({
         id: "paper-main",
         family: "paper",
         version: "1.21.4"
+      },
+      {
+        id: "proxy-main",
+        family: "velocity",
+        version: "latest",
+        backends: ["paper-main"],
+        forwardingMode: "legacy"
       }
     ]
   },

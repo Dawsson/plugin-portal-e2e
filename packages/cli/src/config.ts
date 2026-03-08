@@ -30,7 +30,9 @@ const releaseSourceSchema = z.discriminatedUnion("mode", [
 const serverSchema = z.object({
   id: z.string(),
   family: z.enum(["paper", "purpur", "pufferfish", "spigot", "velocity", "waterfall", "bungeecord"]),
-  version: z.string()
+  version: z.string(),
+  backends: z.array(z.string()).optional(),
+  forwardingMode: z.enum(["modern", "legacy"]).optional()
 });
 
 const stepSchema = z.discriminatedUnion("action", [
@@ -92,6 +94,27 @@ export const e2eConfigSchema = z.object({
   topology: z.object({
     preset: z.enum(["single-paper", "paper-family", "proxy-velocity", "proxy-waterfall", "proxy-bungeecord", "full"]),
     servers: z.array(serverSchema).min(1)
+  }).superRefine((topology, ctx) => {
+    const proxies = topology.servers.filter((server) =>
+      server.family === "velocity" || server.family === "waterfall" || server.family === "bungeecord"
+    );
+    if (proxies.length > 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Only one proxy is supported per topology right now"
+      });
+    }
+    const ids = new Set(topology.servers.map((server) => server.id));
+    for (const server of proxies) {
+      for (const backend of server.backends ?? []) {
+        if (!ids.has(backend)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Proxy ${server.id} references unknown backend ${backend}`
+          });
+        }
+      }
+    }
   }),
   watch: z.object({
     include: z.array(z.string()).default([]),
