@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "plugin_portal_e2e_client",
+  "version": "${version}",
+  "name": "Plugin Portal E2E Client",
+  "description": "Client-side automation harness for Plugin Portal visual end-to-end testing.",
+  "authors": [
+    "Dawsson"
+  ],
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      {
+        "adapter": "kotlin",
+        "value": "gg.flyte.pluginportal.e2e.client.PluginPortalE2EClient"
+      }
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "fabric": "*",
+    "minecraft": "~1.21.4",
+    "java": ">=21",
+    "fabric-language-kotlin": ">=1.13.9+kotlin.2.3.10"
+  }
+}
+
