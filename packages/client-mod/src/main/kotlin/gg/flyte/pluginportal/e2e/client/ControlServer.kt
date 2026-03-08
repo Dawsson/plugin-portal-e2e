@@ -63,6 +63,7 @@ class ControlServer(
                     "takeScreenshot" -> takeScreenshot(request)
                     "waitForChat" -> waitForChat(request)
                     "clickChat" -> clickChat(request)
+                    "inspectChat" -> inspectChat(request)
                     else -> unsupported(request, "Unknown action: ${request.action}")
                 }
                 writer.write(gson.toJson(response))
@@ -419,6 +420,27 @@ class ControlServer(
                 "value" to clickEvent.value,
                 "afterSequence" to afterSequence.toString()
             )
+        )
+    }
+
+    private fun inspectChat(request: ControlRequest): ControlResponse {
+        val payload = gson.toJson(
+            mapOf(
+                "entries" to ChatCapture.snapshot().map { entry ->
+                    mapOf(
+                        "sequence" to entry.sequence,
+                        "plain" to entry.plain
+                    )
+                },
+                "clicks" to ChatCapture.latestClicks()
+            )
+        )
+
+        return ControlResponse(
+            id = request.id,
+            ok = true,
+            message = "Captured chat snapshot",
+            payload = payload
         )
     }
 

@@ -55,4 +55,30 @@ object ChatCapture {
         val text: String,
         val clickEvent: ClickEvent
     )
+
+    data class ClickSummary(
+        val text: String,
+        val action: String,
+        val value: String
+    )
+
+    fun snapshot(limit: Int = 20): List<ChatEntry> = entries.takeLast(limit)
+
+    fun latestClicks(limit: Int = 20): List<ClickSummary> {
+        val clicks = mutableListOf<ClickSummary>()
+        for (entry in entries.asReversed()) {
+            for (segment in entry.raw.getWithStyle(Style.EMPTY).asReversed()) {
+                val clickEvent = segment.style.clickEvent ?: continue
+                clicks += ClickSummary(
+                    text = segment.string,
+                    action = clickEvent.action.name,
+                    value = clickEvent.value
+                )
+                if (clicks.size >= limit) {
+                    return clicks
+                }
+            }
+        }
+        return clicks
+    }
 }

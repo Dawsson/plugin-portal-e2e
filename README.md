@@ -40,6 +40,7 @@ bun run verify:matrix
 ```bash
 bun run doctor
 bun run bootstrap
+bun run inspect-chat
 bun run verify
 bun run typecheck
 bun run e2e help
@@ -65,6 +66,7 @@ Supported commands:
 - `doctor`
 - `bootstrap`
 - `verify`
+- `inspect-chat`
 - `run`
 - `record`
 - `clean`
@@ -178,6 +180,8 @@ Each run creates a new folder under `artifacts/`:
 - `data/resolved-run.json`
 - `data/run-summary.json`
 - `data/file-explorer.svg`
+
+When the real client is already running, `bun run inspect-chat` dumps the latest captured chat lines and clickable targets. Use that to script `clickChat` flows without guessing the exact component text.
 
 Matrix runs also write:
 

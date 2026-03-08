@@ -28,6 +28,7 @@ Run from this repo root:
 bun install
 bun run doctor
 bun run bootstrap
+bun run inspect-chat
 bun run verify
 bun run run:quick-local
 bun run run:quick-prod
@@ -50,6 +51,7 @@ Commands:
 
 - `doctor` checks local prerequisites
 - `bootstrap` prepares local state, builds the client mod, and installs the Prism instance
+- `inspect-chat` prints the latest captured chat lines and clickable targets from the running client
 - `run` executes a client-backed scenario run
 - `record` executes a client-backed scenario run with recording enabled
 - `clean` removes generated state and artifacts according to config
@@ -126,6 +128,8 @@ Client-backed scenarios use steps like:
 - `clickChat`
 - `takeScreenshot`
 - `delay`
+
+If you need the exact clickable labels before writing a client scenario, run `bun run inspect-chat` while the client is open on the target screen.
 
 Server-only scenarios use steps like:
 

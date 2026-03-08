@@ -18,5 +18,6 @@ data class ControlResponse(
     val id: String? = null,
     val ok: Boolean,
     val message: String,
-    val result: Map<String, String> = emptyMap()
+    val result: Map<String, String> = emptyMap(),
+    val payload: String? = null
 )

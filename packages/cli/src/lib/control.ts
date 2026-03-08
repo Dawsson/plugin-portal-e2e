@@ -19,6 +19,7 @@ export interface ControlResponse {
   ok: boolean;
   message: string;
   result?: Record<string, string>;
+  payload?: string;
 }
 
 export async function sendControlRequest(host: string, port: number, request: ControlRequest): Promise<ControlResponse> {

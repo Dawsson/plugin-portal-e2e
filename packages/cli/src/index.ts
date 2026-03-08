@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { bootstrap } from "./commands/bootstrap.ts";
 import { clean } from "./commands/clean.ts";
 import { doctor } from "./commands/doctor.ts";
+import { inspectChat } from "./commands/inspect-chat.ts";
 import { runPreset } from "./commands/run.ts";
 import { verifyConfig, verifyMatrix } from "./commands/verify.ts";
 import { loadConfig } from "./lib/config.ts";
@@ -48,6 +49,7 @@ async function main(): Promise<void> {
       "  run",
       "  record",
       "  clean",
+      "  inspect-chat",
       "  verify",
       "  verify-matrix",
       "",
@@ -83,6 +85,9 @@ async function main(): Promise<void> {
     }
     case "clean":
       await clean(root, config);
+      return;
+    case "inspect-chat":
+      await inspectChat();
       return;
     case "verify":
       await verifyConfig(root, config);
