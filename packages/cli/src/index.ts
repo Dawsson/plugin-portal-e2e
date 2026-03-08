@@ -13,6 +13,19 @@ function readFlag(args: string[], name: string): string | undefined {
   return args[index + 1];
 }
 
+function readMatrixSelection(args: string[]) {
+  const only = readFlag(args, "--only")
+    ?.split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const kind = readFlag(args, "--kind");
+
+  return {
+    only: only && only.length > 0 ? new Set(only) : undefined,
+    kind: kind === "standalone" || kind === "proxy" ? kind : "all"
+  } as const;
+}
+
 async function main(): Promise<void> {
   const root = resolve(import.meta.dir, "../../..");
   loadEnvFiles(root);
@@ -39,7 +52,7 @@ async function main(): Promise<void> {
       await clean(root, config);
       return;
     case "verify-matrix":
-      await verifyMatrix(root, config);
+      await verifyMatrix(root, config, readMatrixSelection(args));
       return;
     default:
       throw new Error(`Unknown command: ${command}`);

@@ -1,5 +1,10 @@
 import type { E2EConfig } from "../types.ts";
 
+export interface MatrixSelection {
+  only?: Set<string>;
+  kind?: "all" | "standalone" | "proxy";
+}
+
 function standaloneScenarios(family: "paper" | "purpur" | "pufferfish" | "spigot") {
   return [
     {
@@ -64,7 +69,7 @@ function standaloneScenarios(family: "paper" | "purpur" | "pufferfish" | "spigot
   ];
 }
 
-export function buildMatrixConfigs(base: E2EConfig): E2EConfig[] {
+export function buildMatrixConfigs(base: E2EConfig, selection: MatrixSelection = {}): E2EConfig[] {
   const standaloneFamilies = ["paper", "purpur", "pufferfish", "spigot"] as const;
   const proxyFamilies = ["velocity", "waterfall", "bungeecord"] as const;
 
@@ -166,5 +171,28 @@ export function buildMatrixConfigs(base: E2EConfig): E2EConfig[] {
     ]
   }));
 
-  return [...standalone, ...proxied];
+  const candidates = [
+    ...(selection.kind === "proxy" ? [] : standalone),
+    ...(selection.kind === "standalone" ? [] : proxied)
+  ];
+
+  const only = selection.only;
+
+  if (!only || only.size === 0) {
+    return candidates;
+  }
+
+  return candidates.filter((config) => {
+    const names = new Set([
+      config.projectName,
+      ...config.topology.servers.map((server) => server.family),
+      ...config.topology.servers.map((server) => server.id)
+    ]);
+    for (const token of only) {
+      if (names.has(token)) {
+        return true;
+      }
+    }
+    return false;
+  });
 }

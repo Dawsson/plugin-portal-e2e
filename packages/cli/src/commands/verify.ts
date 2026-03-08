@@ -10,7 +10,7 @@ import { TimelineWriter } from "../lib/timeline.ts";
 import { exportServiceLogs, startComposeLogCapture } from "../lib/logs.ts";
 import { startRuntimeWatchers } from "../lib/watch.ts";
 import { runServerScenarios } from "../lib/server-scenario.ts";
-import { buildMatrixConfigs } from "../lib/matrix.ts";
+import { buildMatrixConfigs, type MatrixSelection } from "../lib/matrix.ts";
 import { renderExplorerSnapshot } from "../lib/explorer.ts";
 import { waitForPort } from "../lib/wait.ts";
 
@@ -98,8 +98,11 @@ async function verifySingle(root: string, config: E2EConfig): Promise<{ projectN
   };
 }
 
-export async function verifyMatrix(root: string, baseConfig: E2EConfig): Promise<void> {
-  const matrix = buildMatrixConfigs(baseConfig);
+export async function verifyMatrix(root: string, baseConfig: E2EConfig, selection: MatrixSelection = {}): Promise<void> {
+  const matrix = buildMatrixConfigs(baseConfig, selection);
+  if (matrix.length === 0) {
+    throw new Error("No matrix targets matched the provided selection");
+  }
   const results = [];
   for (const config of matrix) {
     console.log(`Verifying ${config.projectName}`);
