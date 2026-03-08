@@ -15,6 +15,8 @@ import { sendControlRequest, waitForClientMenu, waitForClientReady } from "../li
 import { TimelineWriter } from "../lib/timeline.ts";
 import { exportServiceLogs, startComposeLogCapture } from "../lib/logs.ts";
 import { startRuntimeWatchers } from "../lib/watch.ts";
+import { composeRunVideo, startRecording } from "../lib/recording.ts";
+import { closeObs } from "../lib/obs.ts";
 
 function isBackendFamily(family: string): family is ServerFamily {
   return family === "paper" || family === "purpur" || family === "pufferfish" || family === "spigot";
@@ -57,6 +59,8 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
   let instanceDir = "";
   let composeLogs: { stop(): Promise<void> } | null = null;
   let runtimeWatchers: { stop(): Promise<void> } | null = null;
+  let recording: { stop(): Promise<string | null> } | null = null;
+  let finalVideoPath: string | null = null;
   let runError: Error | null = null;
 
   try {
@@ -135,6 +139,7 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
   if (!resumeResponse.ok) {
     throw new Error(resumeResponse.message);
   }
+  recording = await startRecording(state, artifacts, config, timeline);
   await runScenarios(config, artifacts, {
     onStepStarted: (event) => {
       timeline.write({
@@ -161,8 +166,13 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
   } finally {
     await runtimeWatchers?.stop();
     await composeLogs?.stop();
+    const rawVideoPath = await recording?.stop() ?? null;
     if (composePath) {
       await exportServiceLogs(composePath, root, config, artifacts);
+    }
+
+    if (rawVideoPath) {
+      finalVideoPath = composeRunVideo(rawVideoPath, artifacts, config);
     }
 
     if (instanceDir) {
@@ -180,6 +190,8 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
         ok: runError === null,
         composePath,
         instanceDir,
+        rawVideoPath,
+        finalVideoPath,
         artifacts
       }, null, 2)}\n`,
       "utf8"
@@ -194,6 +206,10 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
       } catch {
         closePrismClient(config.client);
       }
+    }
+
+    if (config.recording.enabled && config.recording.provider === "obs") {
+      closeObs();
     }
 
     if (composePath && config.cleanup.stopContainers) {
