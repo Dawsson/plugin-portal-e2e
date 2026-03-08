@@ -18,6 +18,9 @@ const config = defineConfig({
       appPath: process.env.PP_E2E_PRISM_APP_PATH ?? "/Applications/Prism Launcher.app/Contents/MacOS/prismlauncher",
       instanceName: process.env.PP_E2E_PRISM_INSTANCE_NAME ?? "plugin-portal-e2e-1.21.4",
       profile: process.env.PP_E2E_PRISM_PROFILE ?? "Dawsson"
+    },
+    macos: {
+      launchMode: "background"
     }
   },
   cleanup: {
@@ -27,7 +30,7 @@ const config = defineConfig({
   },
   recording: {
     enabled: true,
-    provider: "obs",
+    provider: "native",
     composeRightPanel: true,
     panelWidth: 480
   },

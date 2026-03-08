@@ -16,6 +16,9 @@ export default defineConfig({
     prism: {
       appPath: "/Applications/Prism Launcher.app",
       instanceName: "plugin-portal-e2e-1.21.4"
+    },
+    macos: {
+      launchMode: "background"
     }
   },
   cleanup: {

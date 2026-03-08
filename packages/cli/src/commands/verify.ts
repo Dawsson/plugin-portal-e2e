@@ -28,7 +28,7 @@ function cleanServerRuntime(root: string, config: E2EConfig): void {
     const remappedDir = join(pluginsDir, ".paper-remapped");
     if (existsSync(pluginsDir)) {
       for (const entry of readdirSync(pluginsDir)) {
-        if (entry.startsWith("PluginPortal") && entry.endsWith(".jar")) {
+        if ((entry.startsWith("PluginPortal") || entry.startsWith("[PP] ")) && entry.endsWith(".jar")) {
           rmSync(join(pluginsDir, entry), { force: true });
         }
       }

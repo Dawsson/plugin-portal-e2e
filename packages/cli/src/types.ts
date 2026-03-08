@@ -44,6 +44,9 @@ export interface ClientConfig {
     instanceName: string;
     profile?: string;
   };
+  macos?: {
+    launchMode?: "foreground" | "background" | "fullscreen-space";
+  };
 }
 
 export interface CleanupConfig {
@@ -54,7 +57,7 @@ export interface CleanupConfig {
 
 export interface RecordingConfig {
   enabled: boolean;
-  provider: "obs" | "ffmpeg" | "none";
+  provider: "native" | "ffmpeg" | "none";
   composeRightPanel: boolean;
   panelWidth: number;
 }
@@ -78,6 +81,7 @@ export interface ScenarioStep {
     | "assertOutputContains"
     | "waitForServiceLog"
     | "waitForFile"
+    | "waitForFileChange"
     | "assertFileExists";
   value?: string;
   name?: string;

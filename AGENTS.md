@@ -12,7 +12,7 @@ It owns:
 - Docker topology generation and verification
 - Prism client bootstrapping
 - Fabric client automation mod
-- recording/composition helpers
+- native macOS recording/composition helpers
 - artifacts, logs, timelines, and scenario execution
 
 It does not own the Plugin Portal API or Paper plugin source. Those live in sibling repos:
@@ -71,6 +71,8 @@ bun run e2e verify --config e2e.config.proxy-two-paper.example.ts
 ```
 
 Topology helper builders are exported from `packages/cli/src/config.ts`.
+
+On macOS, client configs can set `client.macos.launchMode` to `foreground`, `background`, or `fullscreen-space`.
 
 ## Topology Terms
 

@@ -2,12 +2,12 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { E2EConfig, LocalState } from "../types.ts";
 import type { ArtifactPaths } from "./artifacts.ts";
-import { ensureObsWebSocketEnabled, launchObs, ObsClient } from "./obs.ts";
 import { runCommand, runStreaming, type StreamingCommand } from "./exec.ts";
+import { waitForMinecraftWindowId } from "./macos.ts";
 import type { TimelineWriter } from "./timeline.ts";
 
 type RecordingHandle = {
-  provider: "obs" | "ffmpeg";
+  provider: "native" | "ffmpeg";
   stop(): Promise<string | null>;
 };
 
@@ -65,67 +65,37 @@ async function startFfmpegRecording(
   };
 }
 
-async function startObsRecording(
-  state: LocalState,
+async function startNativeRecording(
+  _state: LocalState,
   artifacts: ArtifactPaths,
   timeline: TimelineWriter
 ): Promise<RecordingHandle> {
-  ensureObsWebSocketEnabled(state.obsWebSocketPort ?? 4455);
-  launchObs(state.obsAppPath ?? "/Applications/OBS.app/Contents/MacOS/OBS");
-  const client = new ObsClient();
-  await client.connect(state.obsWebSocketPort ?? 4455, state.obsWebSocketPassword);
-
-  try {
-    await client.request("CreateScene", {
-      sceneName: "Plugin Portal E2E"
-    });
-  } catch {
-    // Scene already exists.
-  }
-
-  try {
-    await client.request("CreateInput", {
-      sceneName: "Plugin Portal E2E",
-      inputName: "E2E Display",
-      inputKind: "display_capture",
-      inputSettings: {
-        monitor: 0
-      },
-      sceneItemEnabled: true
-    });
-  } catch {
-    // Input already exists.
-  }
-
-  await client.request("SetCurrentProgramScene", {
-    sceneName: "Plugin Portal E2E"
-  });
-
-  try {
-    await client.request("SetRecordDirectory", {
-      recordDirectory: artifacts.video
-    });
-  } catch {
-    // Older profiles may reject this; StopRecord still returns the output path.
-  }
-
-  await client.request("StartRecord");
+  const outputPath = join(artifacts.video, "raw.mov");
+  const windowId = await waitForMinecraftWindowId(30_000);
+  const process = runStreaming([
+    "screencapture",
+    "-x",
+    "-v",
+    `-l${windowId}`,
+    outputPath
+  ]);
   timeline.write({
     type: "recording.started",
-    provider: "obs"
+    provider: "native",
+    path: outputPath,
+    windowId
   });
 
   return {
-    provider: "obs",
+    provider: "native",
     async stop(): Promise<string | null> {
-      const response = await client.request<{ outputPath?: string }>("StopRecord");
-      client.disconnect();
+      await process.stop("SIGINT");
       timeline.write({
         type: "recording.stopped",
-        provider: "obs",
-        path: response.outputPath ?? ""
+        provider: "native",
+        path: outputPath
       });
-      return response.outputPath ?? null;
+      return outputPath;
     }
   };
 }
@@ -305,17 +275,8 @@ export async function startRecording(
     return null;
   }
 
-  if (config.recording.provider === "obs") {
-    try {
-      return await startObsRecording(state, artifacts, timeline);
-    } catch (error) {
-      timeline.write({
-        type: "recording.fallback",
-        provider: "obs",
-        error: error instanceof Error ? error.message : String(error)
-      });
-      return await startFfmpegRecording(artifacts, timeline);
-    }
+  if (config.recording.provider === "native") {
+    return await startNativeRecording(state, artifacts, timeline);
   }
 
   return await startFfmpegRecording(artifacts, timeline);

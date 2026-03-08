@@ -26,6 +26,37 @@ async function waitForRuntimeFile(root: string, service: string, pattern: string
   throw new Error(`Timed out waiting for ${service}:${pattern}`);
 }
 
+async function waitForRuntimeFileChange(root: string, service: string, pattern: string, timeoutMs: number): Promise<string> {
+  const runtimeRoot = runtimeRootForService(root, service);
+  const glob = new Bun.Glob(pattern);
+  const baseline = new Map<string, number>();
+
+  for await (const relPath of glob.scan({ cwd: runtimeRoot, absolute: false, dot: true, onlyFiles: false })) {
+    const absPath = join(runtimeRoot, relPath);
+    if (existsSync(absPath)) {
+      baseline.set(relPath, Bun.file(absPath).lastModified);
+    }
+  }
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for await (const relPath of glob.scan({ cwd: runtimeRoot, absolute: false, dot: true, onlyFiles: false })) {
+      const absPath = join(runtimeRoot, relPath);
+      if (!existsSync(absPath)) {
+        continue;
+      }
+      const mtimeMs = Bun.file(absPath).lastModified;
+      const prior = baseline.get(relPath);
+      if (prior === undefined || mtimeMs > prior) {
+        return relPath;
+      }
+    }
+    await Bun.sleep(500);
+  }
+
+  throw new Error(`Timed out waiting for file change ${service}:${pattern}`);
+}
+
 export async function runServerScenarios(
   root: string,
   composePath: string,
@@ -87,6 +118,26 @@ export async function runServerScenarios(
 
       if (step.action === "waitForFile") {
         const matchedPath = await waitForRuntimeFile(
+          root,
+          step.service ?? "paper-main",
+          step.pattern ?? "",
+          step.timeoutMs ?? 60_000
+        );
+        timeline.write({
+          type: "scenario.step.finished",
+          scenario: scenario.id,
+          stepIndex: index,
+          action: step.action,
+          ok: true,
+          service: step.service,
+          pattern: step.pattern,
+          path: matchedPath
+        });
+        continue;
+      }
+
+      if (step.action === "waitForFileChange") {
+        const matchedPath = await waitForRuntimeFileChange(
           root,
           step.service ?? "paper-main",
           step.pattern ?? "",

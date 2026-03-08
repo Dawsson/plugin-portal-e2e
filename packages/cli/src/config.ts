@@ -81,6 +81,12 @@ const stepSchema = z.discriminatedUnion("action", [
     timeoutMs: z.number().int().positive().optional()
   }),
   z.object({
+    action: z.literal("waitForFileChange"),
+    service: z.string(),
+    pattern: z.string(),
+    timeoutMs: z.number().int().positive().optional()
+  }),
+  z.object({
     action: z.literal("assertFileExists"),
     service: z.string(),
     path: z.string()
@@ -104,7 +110,10 @@ export const e2eConfigSchema = z.object({
       appPath: z.string(),
       instanceName: z.string(),
       profile: z.string().optional()
-    })
+    }),
+    macos: z.object({
+      launchMode: z.enum(["foreground", "background", "fullscreen-space"]).optional()
+    }).optional()
   }),
   cleanup: z.object({
     closeClient: z.boolean().default(true),
@@ -113,7 +122,7 @@ export const e2eConfigSchema = z.object({
   }),
   recording: z.object({
     enabled: z.boolean().default(false),
-    provider: z.enum(["obs", "ffmpeg", "none"]).default("none"),
+    provider: z.enum(["native", "ffmpeg", "none"]).default("none"),
     composeRightPanel: z.boolean().default(true),
     panelWidth: z.number().int().positive().default(480)
   }),

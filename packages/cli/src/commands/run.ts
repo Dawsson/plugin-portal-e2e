@@ -16,8 +16,8 @@ import { TimelineWriter } from "../lib/timeline.ts";
 import { exportServiceLogs, startComposeLogCapture } from "../lib/logs.ts";
 import { startRuntimeWatchers } from "../lib/watch.ts";
 import { composeRunVideo, startRecording } from "../lib/recording.ts";
-import { closeObs } from "../lib/obs.ts";
 import { renderExplorerSnapshot } from "../lib/explorer.ts";
+import { activateApp, frontmostAppName, scheduleFullscreenSpace } from "../lib/macos.ts";
 
 function isBackendFamily(family: string): family is ServerFamily {
   return family === "paper" || family === "purpur" || family === "pufferfish" || family === "spigot";
@@ -35,7 +35,7 @@ function cleanServerRuntime(root: string, config: E2EConfig): void {
 
     if (existsSync(pluginsDir)) {
       for (const entry of readdirSync(pluginsDir)) {
-        if (entry.startsWith("PluginPortal") && entry.endsWith(".jar")) {
+        if ((entry.startsWith("PluginPortal") || entry.startsWith("[PP] ")) && entry.endsWith(".jar")) {
           rmSync(join(pluginsDir, entry), { force: true });
         }
       }
@@ -63,6 +63,19 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
   let recording: { stop(): Promise<string | null> } | null = null;
   let finalVideoPath: string | null = null;
   let runError: Error | null = null;
+  let previousFrontApp: string | null = null;
+  const effectiveClientConfig = {
+    ...config.client,
+    macos: {
+      ...config.client.macos,
+      launchMode:
+        process.platform === "darwin" &&
+        config.recording.enabled &&
+        config.recording.provider === "native"
+          ? "foreground"
+          : (config.client.macos?.launchMode ?? "background")
+    }
+  } satisfies E2EConfig["client"];
 
   try {
   const modBuild = runCommand(["./gradlew", ":packages:client-mod:build"], root);
@@ -113,9 +126,14 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
     180_000
   );
   await waitForPort("127.0.0.1", 25565, 180_000);
-  launchPrismClient(config.client);
+  previousFrontApp = frontmostAppName();
+  launchPrismClient(effectiveClientConfig);
   await waitForPort("127.0.0.1", 44712, 180_000);
   await waitForClientMenu("127.0.0.1", 44712, 180_000);
+  if (process.platform === "darwin" && effectiveClientConfig.macos?.launchMode === "fullscreen-space") {
+    scheduleFullscreenSpace("java", previousFrontApp, 1);
+    await Bun.sleep(4_000);
+  }
   const dismissResponse = await sendControlRequest("127.0.0.1", 44712, {
     id: "dismiss-onboarding",
     action: "dismissOnboarding"
@@ -141,7 +159,10 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
     throw new Error(resumeResponse.message);
   }
   recording = await startRecording(state, artifacts, config, timeline);
-  await runScenarios(config, artifacts, {
+  if (process.platform === "darwin" && config.recording.enabled && config.recording.provider === "native" && previousFrontApp) {
+    activateApp(previousFrontApp);
+  }
+  await runScenarios(config, artifacts, { root, composePath }, {
     onStepStarted: (event) => {
       timeline.write({
         type: "scenario.step.started",
@@ -207,12 +228,8 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
           action: "quitClient"
         });
       } catch {
-        closePrismClient(config.client);
+        closePrismClient(effectiveClientConfig);
       }
-    }
-
-    if (config.recording.enabled && config.recording.provider === "obs") {
-      closeObs();
     }
 
     if (composePath && config.cleanup.stopContainers) {

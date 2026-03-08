@@ -96,6 +96,7 @@ class ControlServer(
         )
 
         val client = MinecraftClient.getInstance()
+        val afterSequence = ChatCapture.snapshotSequence()
         client.execute {
             prepareWorldView(client)
             val player = client.player ?: return@execute
@@ -112,7 +113,10 @@ class ControlServer(
             id = request.id,
             ok = true,
             message = "Command dispatched",
-            result = mapOf("command" to command)
+            result = mapOf(
+                "command" to command,
+                "afterSequence" to afterSequence.toString()
+            )
         )
     }
 
@@ -358,13 +362,16 @@ class ControlServer(
             message = "Missing chat text"
         )
         val timeoutMs = request.timeoutMs ?: 5_000L
-        val match = ChatCapture.waitForText(target, timeoutMs)
+        val match = ChatCapture.waitForText(target, timeoutMs, request.afterSequence ?: 0)
         return if (match != null) {
             ControlResponse(
                 id = request.id,
                 ok = true,
                 message = "Matched chat text",
-                result = mapOf("text" to match.plain)
+                result = mapOf(
+                    "text" to match.plain,
+                    "sequence" to match.sequence.toString()
+                )
             )
         } else {
             ControlResponse(
@@ -389,6 +396,7 @@ class ControlServer(
 
         val client = MinecraftClient.getInstance()
         val clickEvent = clickTarget.clickEvent
+        val afterSequence = ChatCapture.snapshotSequence()
         client.execute {
             when (clickEvent.action) {
                 ClickEvent.Action.RUN_COMMAND,
@@ -408,7 +416,8 @@ class ControlServer(
             result = mapOf(
                 "text" to clickTarget.text,
                 "action" to clickEvent.action.name,
-                "value" to clickEvent.value
+                "value" to clickEvent.value,
+                "afterSequence" to afterSequence.toString()
             )
         )
     }

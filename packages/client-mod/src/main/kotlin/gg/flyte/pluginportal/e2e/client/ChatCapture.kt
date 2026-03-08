@@ -26,11 +26,11 @@ object ChatCapture {
 
     fun snapshotSequence(): Long = nextSequence
 
-    fun waitForText(target: String, timeoutMs: Long): ChatEntry? {
+    fun waitForText(target: String, timeoutMs: Long, afterSequence: Long = 0): ChatEntry? {
         val lowerTarget = target.lowercase()
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
-            val match = entries.lastOrNull { it.plain.lowercase().contains(lowerTarget) }
+            val match = entries.lastOrNull { it.sequence > afterSequence && it.plain.lowercase().contains(lowerTarget) }
             if (match != null) return match
             Thread.sleep(50)
         }

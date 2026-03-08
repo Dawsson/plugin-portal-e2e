@@ -10,7 +10,8 @@ data class ControlRequest(
     val path: String? = null,
     val timeoutMs: Long? = null,
     val delayMs: Long? = null,
-    val openChat: Boolean? = null
+    val openChat: Boolean? = null,
+    val afterSequence: Long? = null
 )
 
 data class ControlResponse(

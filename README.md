@@ -6,7 +6,7 @@ This repo drives:
 
 - Docker server and proxy topologies
 - real Prism/Fabric client automation
-- screenshot and recording artifacts
+- screenshot and native macOS window recording artifacts
 - server-side matrix verification
 - file/log/timeline capture
 
@@ -24,7 +24,7 @@ In progress:
 
 - polished client/background lane
 - broader clickable-chat coverage
-- recording polish and background isolation
+- background/fullscreen-space capture polish
 
 ## Quick Start
 
@@ -107,6 +107,16 @@ Important config surfaces:
 - `topology`
 - `watch`
 - `scenarios`
+
+On macOS, `client.macos.launchMode` supports:
+
+- `foreground`
+- `background`
+- `fullscreen-space`
+
+The current default is `background`.
+
+Recording now defaults to the native macOS window recorder through `screencapture`.
 
 ## Topology Validation
 

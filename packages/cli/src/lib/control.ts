@@ -11,6 +11,7 @@ export interface ControlRequest {
   timeoutMs?: number;
   delayMs?: number;
   openChat?: boolean;
+  afterSequence?: number;
 }
 
 export interface ControlResponse {

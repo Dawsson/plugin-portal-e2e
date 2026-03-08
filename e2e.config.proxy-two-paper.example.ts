@@ -28,6 +28,9 @@ export default defineConfig({
       appPath: process.env.PP_E2E_PRISM_APP_PATH ?? "/Applications/Prism Launcher.app/Contents/MacOS/prismlauncher",
       instanceName: "plugin-portal-e2e-1.21.4",
       profile: "Dawsson"
+    },
+    macos: {
+      launchMode: "background"
     }
   },
   cleanup: {
