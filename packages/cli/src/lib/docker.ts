@@ -2,6 +2,7 @@ import { join, resolve } from "node:path";
 import type { E2EConfig, ProxyFamily, ServerFamily, ServerNode } from "../types.ts";
 import { ensureDir } from "./fs.ts";
 import { runCommand } from "./exec.ts";
+import type { ResolvedRelease } from "./release.ts";
 
 function backendImageFor(family: ServerFamily): string {
   return "itzg/minecraft-server:latest";
@@ -39,24 +40,34 @@ function proxyTypeFor(family: ProxyFamily): string {
   }
 }
 
-function backendService(node: ServerNode): string {
+function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRelease, exposeOnHost: boolean): string {
   if (!isServerFamily(node.family)) {
     throw new Error(`Expected backend family, received ${node.family}`);
   }
   const volumes = [
     `      - ${resolve(`.state/runtime/${node.id}`)}:/data`
   ];
-  return [
-    `  ${node.id}:`,
-    `    image: ${backendImageFor(node.family)}`,
+  const environment = [
     "    environment:",
     `      TYPE: ${backendTypeFor(node.family)}`,
     `      VERSION: ${node.version}`,
     "      EULA: \"TRUE\"",
     "      ONLINE_MODE: \"FALSE\"",
-    "      MEMORY: 2G",
-    "    ports:",
-    "      - \"25565\"",
+    "      MEMORY: 2G"
+  ];
+  if (config.apiTarget.mode !== "production") {
+    environment.push(`      JVM_DD_OPTS: -Dpluginportal.baseUrl=${config.apiTarget.baseUrl} -Dpluginportal.wsBaseUrl=${config.apiTarget.baseUrl.replace("https://", "wss://").replace("http://", "ws://")}`)
+  }
+  if (release.kind === "url") {
+    environment.push(`      PLUGINS: ${release.value}`)
+  } else {
+    volumes.push(`      - ${release.value}:/plugins/${release.filename}:ro`)
+  }
+  return [
+    `  ${node.id}:`,
+    `    image: ${backendImageFor(node.family)}`,
+    ...environment,
+    ...(exposeOnHost ? ["    ports:", "      - \"25565:25565\""] : []),
     "    volumes:",
     ...volumes
   ].join("\n");
@@ -77,11 +88,12 @@ function proxyService(node: ServerNode): string {
   ].join("\n");
 }
 
-export function generateComposeYaml(config: E2EConfig): string {
+export function generateComposeYaml(config: E2EConfig, release: ResolvedRelease): string {
   const services: string[] = [];
-  for (const server of config.topology.servers) {
+  const hasProxy = config.topology.servers.some((server) => isProxyFamily(server.family));
+  for (const [index, server] of config.topology.servers.entries()) {
     if (isServerFamily(server.family)) {
-      services.push(backendService(server));
+      services.push(backendService(server, config, release, !hasProxy && index === 0));
     } else if (isProxyFamily(server.family)) {
       services.push(proxyService(server));
     }
@@ -92,12 +104,12 @@ export function generateComposeYaml(config: E2EConfig): string {
   ].join("\n");
 }
 
-export function writeComposeFile(root: string, config: E2EConfig): string {
+export function writeComposeFile(root: string, config: E2EConfig, release: ResolvedRelease): string {
   const stateRoot = resolve(root, ".state/generated", config.projectName);
   ensureDir(stateRoot);
   ensureDir(resolve(root, ".state/runtime"));
   const composePath = join(stateRoot, "docker-compose.yml");
-  Bun.write(composePath, `${generateComposeYaml(config)}\n`);
+  Bun.write(composePath, `${generateComposeYaml(config, release)}\n`);
   return composePath;
 }
 
@@ -115,4 +127,29 @@ export function dockerComposeDown(composePath: string, root: string, wipeVolumes
   if (!result.ok) {
     throw new Error(`docker compose down failed\n${result.stderr}`);
   }
+}
+
+export async function waitForServiceLog(
+  composePath: string,
+  root: string,
+  service: string,
+  pattern: RegExp,
+  timeoutMs: number
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const result = runCommand(
+      ["docker", "compose", "-f", composePath, "logs", "--no-color", "--tail=200", service],
+      root
+    );
+
+    if (result.ok && pattern.test(result.stdout)) {
+      return;
+    }
+
+    await Bun.sleep(1_000);
+  }
+
+  throw new Error(`Timed out waiting for ${service} logs to match ${pattern}`);
 }

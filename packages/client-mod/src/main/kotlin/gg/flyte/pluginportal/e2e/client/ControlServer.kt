@@ -2,9 +2,11 @@ package gg.flyte.pluginportal.e2e.client
 
 import com.google.gson.Gson
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.gui.screen.AccessibilityOnboardingScreen
 import net.minecraft.client.gui.screen.TitleScreen
-import net.minecraft.client.gui.screen.multiplayer.ConnectScreen
-import net.minecraft.client.network.CookieStorage
+import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen
+import net.minecraft.client.gui.screen.multiplayer.MultiplayerServerListWidget
+import net.minecraft.client.option.ServerList
 import net.minecraft.client.network.ServerAddress
 import net.minecraft.client.network.ServerInfo
 import net.minecraft.client.util.ScreenshotRecorder
@@ -50,6 +52,8 @@ class ControlServer(
                 val request = gson.fromJson(line, ControlRequest::class.java)
                 val response = when (request.action) {
                     "ping" -> ping(request)
+                    "dismissOnboarding" -> dismissOnboarding(request)
+                    "resumeGame" -> resumeGame(request)
                     "connect" -> connect(request)
                     "runCommand" -> runCommand(request)
                     "takeScreenshot" -> takeScreenshot(request)
@@ -73,7 +77,9 @@ class ControlServer(
             result = mapOf(
                 "minecraftVersion" to SharedConstants.getGameVersion().name,
                 "playerPresent" to (client.player != null).toString(),
-                "worldLoaded" to (client.world != null).toString()
+                "worldLoaded" to (client.world != null).toString(),
+                "screenClass" to (client.currentScreen?.javaClass?.name ?: ""),
+                "screenTitle" to (client.currentScreen?.title?.string ?: "")
             )
         )
     }
@@ -115,16 +121,47 @@ class ControlServer(
         val future = CompletableFuture<ControlResponse>()
         val client = MinecraftClient.getInstance()
         client.execute {
-            val address = ServerAddress.parse(addressValue)
             val serverInfo = ServerInfo("Plugin Portal E2E", addressValue, ServerInfo.ServerType.OTHER)
-            ConnectScreen.connect(
-                TitleScreen(),
-                client,
-                address,
-                serverInfo,
-                false,
-                CookieStorage(emptyMap())
-            )
+            val multiplayerScreen = MultiplayerScreen(TitleScreen())
+            client.setScreen(multiplayerScreen)
+            multiplayerScreen.init(client, client.window.scaledWidth, client.window.scaledHeight)
+
+            val serverList = multiplayerScreen.serverList
+            serverList.tryUnhide(addressValue)
+            serverList.add(serverInfo, true)
+            serverList.saveFile()
+
+            val serverListWidget = multiplayerScreen.children()
+                .firstOrNull { it is MultiplayerServerListWidget } as? MultiplayerServerListWidget
+
+            if (serverListWidget == null) {
+                future.complete(
+                    ControlResponse(
+                        id = request.id,
+                        ok = false,
+                        message = "Multiplayer server list widget was not available"
+                    )
+                )
+                return@execute
+            }
+
+            serverListWidget.setServers(serverList)
+            val entry = serverListWidget.children().firstOrNull()
+
+            if (entry == null) {
+                future.complete(
+                    ControlResponse(
+                        id = request.id,
+                        ok = false,
+                        message = "No multiplayer server entry was created"
+                    )
+                )
+                return@execute
+            }
+
+            serverListWidget.setSelected(entry)
+            multiplayerScreen.select(entry)
+            multiplayerScreen.connect()
             PluginPortalE2EClient.logger.info("Connecting to {}", addressValue)
             future.complete(
                 ControlResponse(
@@ -132,6 +169,69 @@ class ControlServer(
                     ok = true,
                     message = "Connection started",
                     result = mapOf("address" to addressValue)
+                )
+            )
+        }
+        return future.get(10, TimeUnit.SECONDS)
+    }
+
+    private fun dismissOnboarding(request: ControlRequest): ControlResponse {
+        val future = CompletableFuture<ControlResponse>()
+        val client = MinecraftClient.getInstance()
+        client.execute {
+            if (client.currentScreen is AccessibilityOnboardingScreen) {
+                client.setScreen(TitleScreen())
+                PluginPortalE2EClient.logger.info("Dismissed accessibility onboarding screen")
+                future.complete(
+                    ControlResponse(
+                        id = request.id,
+                        ok = true,
+                        message = "Dismissed onboarding screen"
+                    )
+                )
+                return@execute
+            }
+
+            future.complete(
+                ControlResponse(
+                    id = request.id,
+                    ok = true,
+                    message = "No onboarding screen was present"
+                )
+            )
+        }
+        return future.get(10, TimeUnit.SECONDS)
+    }
+
+    private fun closeActiveScreen(client: MinecraftClient) {
+        val screen = client.currentScreen ?: return
+        screen.close()
+        if (client.currentScreen != null) {
+            client.setScreen(null)
+        }
+    }
+
+    private fun resumeGame(request: ControlRequest): ControlResponse {
+        val future = CompletableFuture<ControlResponse>()
+        val client = MinecraftClient.getInstance()
+        client.execute {
+            if (client.player != null && client.world != null) {
+                closeActiveScreen(client)
+                future.complete(
+                    ControlResponse(
+                        id = request.id,
+                        ok = true,
+                        message = "Returned to the game world"
+                    )
+                )
+                return@execute
+            }
+
+            future.complete(
+                ControlResponse(
+                    id = request.id,
+                    ok = false,
+                    message = "Client is not currently in a world"
                 )
             )
         }
@@ -151,15 +251,31 @@ class ControlServer(
         val future = CompletableFuture<ControlResponse>()
         val client = MinecraftClient.getInstance()
         client.execute {
-            ScreenshotRecorder.saveScreenshot(directory, screenshotName, client.framebuffer) { _ ->
-                future.complete(
-                    ControlResponse(
-                        id = request.id,
-                        ok = true,
-                        message = "Screenshot saved",
-                        result = mapOf("path" to screenshotFile.absolutePath)
+            if (client.player != null && client.world != null && client.currentScreen != null) {
+                closeActiveScreen(client)
+                client.execute {
+                    ScreenshotRecorder.saveScreenshot(directory, screenshotName, client.framebuffer) { _ ->
+                        future.complete(
+                            ControlResponse(
+                                id = request.id,
+                                ok = true,
+                                message = "Screenshot saved",
+                                result = mapOf("path" to screenshotFile.absolutePath)
+                            )
+                        )
+                    }
+                }
+            } else {
+                ScreenshotRecorder.saveScreenshot(directory, screenshotName, client.framebuffer) { _ ->
+                    future.complete(
+                        ControlResponse(
+                            id = request.id,
+                            ok = true,
+                            message = "Screenshot saved",
+                            result = mapOf("path" to screenshotFile.absolutePath)
+                        )
                     )
-                )
+                }
             }
         }
         return future.get(10, TimeUnit.SECONDS)

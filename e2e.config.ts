@@ -4,18 +4,20 @@ const config = defineConfig({
   projectName: "plugin-portal-e2e",
   artifactsDir: "artifacts",
   apiTarget: {
-    mode: "local",
-    baseUrl: "http://localhost:3001"
+    mode: "production",
+    baseUrl: process.env.PP_E2E_API_LOCAL_URL ?? "https://api.dawson.gg"
   },
   releaseSource: {
     mode: "url",
-    url: "https://cdn.modrinth.com/data/5qkQnnWO/versions/3IXITO7f/PluginPortal-3.7.06.jar"
+    url: process.env.PP_E2E_PLUGIN_URL ??
+      "https://cdn.modrinth.com/data/5qkQnnWO/versions/3IXITO7f/PluginPortal-3.7.06.jar"
   },
   client: {
     minecraftVersion: "1.21.4",
     prism: {
-      appPath: "/Applications/Prism Launcher.app/Contents/MacOS/prismlauncher",
-      instanceName: "plugin-portal-e2e-1.21.4"
+      appPath: process.env.PP_E2E_PRISM_APP_PATH ?? "/Applications/Prism Launcher.app/Contents/MacOS/prismlauncher",
+      instanceName: process.env.PP_E2E_PRISM_INSTANCE_NAME ?? "plugin-portal-e2e-1.21.4",
+      profile: process.env.PP_E2E_PRISM_PROFILE ?? "Dawsson"
     }
   },
   topology: {
@@ -44,25 +46,15 @@ const config = defineConfig({
       steps: [
         {
           action: "runCommand",
-          value: "/pp help"
+          value: "/help pp"
+        },
+        {
+          action: "waitForChat",
+          value: "Usage: pp install <name>"
         },
         {
           action: "takeScreenshot",
           name: "help-screen"
-        }
-      ]
-    },
-    {
-      id: "list",
-      kind: "scripted",
-      steps: [
-        {
-          action: "runCommand",
-          value: "/pp list"
-        },
-        {
-          action: "takeScreenshot",
-          name: "list-screen"
         }
       ]
     }
