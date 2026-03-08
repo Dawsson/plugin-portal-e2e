@@ -58,6 +58,21 @@ const stepSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("delay"),
     delayMs: z.number().int().nonnegative()
+  }),
+  z.object({
+    action: z.literal("runServerCommand"),
+    service: z.string(),
+    command: z.string()
+  }),
+  z.object({
+    action: z.literal("assertOutputContains"),
+    value: z.string()
+  }),
+  z.object({
+    action: z.literal("waitForServiceLog"),
+    service: z.string(),
+    pattern: z.string(),
+    timeoutMs: z.number().int().positive().optional()
   })
 ]);
 

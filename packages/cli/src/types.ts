@@ -68,13 +68,16 @@ export interface ServerNode {
 }
 
 export interface ScenarioStep {
-  action: "runCommand" | "waitForChat" | "takeScreenshot" | "clickChat" | "delay";
+  action: "runCommand" | "waitForChat" | "takeScreenshot" | "clickChat" | "delay" | "runServerCommand" | "assertOutputContains" | "waitForServiceLog";
   value?: string;
   name?: string;
   text?: string;
   timeoutMs?: number;
   delayMs?: number;
   openChat?: boolean;
+  service?: string;
+  command?: string;
+  pattern?: string;
 }
 
 export interface Scenario {

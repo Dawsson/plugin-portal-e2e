@@ -56,6 +56,8 @@ function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRe
     "      ONLINE_MODE: \"FALSE\"",
     "      DIFFICULTY: peaceful",
     `      OPS: ${operator}`,
+    "      ENABLE_RCON: \"TRUE\"",
+    "      RCON_PASSWORD: \"plugin-portal-e2e\"",
     "      MEMORY: 2G"
   ];
   if (config.topology.servers.some((candidate) => isProxyFamily(candidate.family) && (candidate.backends ?? []).includes(node.id))) {
@@ -136,6 +138,7 @@ function velocityConfig(node: ServerNode): string {
     'motd = "Plugin Portal E2E"',
     "online-mode = false",
     `player-info-forwarding-mode = "${node.forwardingMode ?? "legacy"}"`,
+    "forced-hosts = {}",
     "",
     "[servers]",
     servers,

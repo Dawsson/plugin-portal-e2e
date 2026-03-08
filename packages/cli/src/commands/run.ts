@@ -17,6 +17,7 @@ import { exportServiceLogs, startComposeLogCapture } from "../lib/logs.ts";
 import { startRuntimeWatchers } from "../lib/watch.ts";
 import { composeRunVideo, startRecording } from "../lib/recording.ts";
 import { closeObs } from "../lib/obs.ts";
+import { renderExplorerSnapshot } from "../lib/explorer.ts";
 
 function isBackendFamily(family: string): family is ServerFamily {
   return family === "paper" || family === "purpur" || family === "pufferfish" || family === "spigot";
@@ -196,6 +197,8 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
       }, null, 2)}\n`,
       "utf8"
     );
+
+    renderExplorerSnapshot(artifacts);
 
     if (config.cleanup.closeClient) {
       try {

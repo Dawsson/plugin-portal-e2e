@@ -3,7 +3,9 @@ import { bootstrap } from "./commands/bootstrap.ts";
 import { clean } from "./commands/clean.ts";
 import { doctor } from "./commands/doctor.ts";
 import { runPreset } from "./commands/run.ts";
+import { verifyMatrix } from "./commands/verify.ts";
 import { loadConfig } from "./lib/config.ts";
+import { loadEnvFiles } from "./lib/env.ts";
 
 function readFlag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -13,6 +15,7 @@ function readFlag(args: string[], name: string): string | undefined {
 
 async function main(): Promise<void> {
   const root = resolve(import.meta.dir, "../../..");
+  loadEnvFiles(root);
   const args = Bun.argv.slice(2);
   const command = args[0] ?? "doctor";
   const config = await loadConfig(root, readFlag(args, "--config"));
@@ -34,6 +37,9 @@ async function main(): Promise<void> {
     }
     case "clean":
       await clean(root, config);
+      return;
+    case "verify-matrix":
+      await verifyMatrix(root, config);
       return;
     default:
       throw new Error(`Unknown command: ${command}`);
