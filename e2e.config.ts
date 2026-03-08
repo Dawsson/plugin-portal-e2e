@@ -46,15 +46,11 @@ const config = defineConfig({
       steps: [
         {
           action: "runCommand",
-          value: "/help pp"
-        },
-        {
-          action: "waitForChat",
-          value: "Usage: pp install <name>"
+          value: "/ppm"
         },
         {
           action: "takeScreenshot",
-          name: "help-screen"
+          name: "ppm-help-screen"
         }
       ]
     }

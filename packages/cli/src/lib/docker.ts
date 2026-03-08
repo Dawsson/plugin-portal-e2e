@@ -47,6 +47,7 @@ function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRe
   const volumes = [
     `      - ${resolve(`.state/runtime/${node.id}`)}:/data`
   ];
+  const operator = process.env.PP_E2E_PLAYER_USERNAME ?? config.client.prism.profile ?? "Dawsson";
   const environment = [
     "    environment:",
     `      TYPE: ${backendTypeFor(node.family)}`,
@@ -54,6 +55,7 @@ function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRe
     "      EULA: \"TRUE\"",
     "      ONLINE_MODE: \"FALSE\"",
     "      DIFFICULTY: peaceful",
+    `      OPS: ${operator}`,
     "      MEMORY: 2G"
   ];
   if (config.apiTarget.mode !== "production") {

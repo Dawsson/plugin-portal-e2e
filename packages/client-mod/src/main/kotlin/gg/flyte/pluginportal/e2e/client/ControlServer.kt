@@ -18,6 +18,8 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.ServerSocket
 import java.net.Socket
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -93,6 +95,7 @@ class ControlServer(
 
         val client = MinecraftClient.getInstance()
         client.execute {
+            prepareWorldView(client)
             val player = client.player ?: return@execute
             val networkHandler = client.networkHandler ?: return@execute
             if (command.startsWith("/")) {
@@ -204,11 +207,8 @@ class ControlServer(
     }
 
     private fun closeActiveScreen(client: MinecraftClient) {
-        val screen = client.currentScreen ?: return
-        screen.close()
-        if (client.currentScreen != null) {
-            client.setScreenAndRender(null)
-        }
+        if (client.currentScreen == null) return
+        client.setScreenAndRender(null)
         if (client.currentScreen == null && client.player != null && client.world != null) {
             client.mouse.lockCursor()
         }
@@ -269,7 +269,6 @@ class ControlServer(
         val screenshotName = (request.name ?: "plugin-portal-e2e").removeSuffix(".png")
         val directory = File(outputDir)
         directory.mkdirs()
-        val screenshotFile = File(directory, "$screenshotName.png")
         val future = CompletableFuture<ControlResponse>()
         val client = MinecraftClient.getInstance()
         client.execute {
@@ -285,12 +284,13 @@ class ControlServer(
                             client.currentScreen?.javaClass?.name ?: "<none>"
                         )
                         ScreenshotRecorder.saveScreenshot(directory, screenshotName, client.framebuffer) { _ ->
+                            val savedFile = normalizeScreenshotPath(directory, screenshotName)
                             future.complete(
                                 ControlResponse(
                                     id = request.id,
                                     ok = true,
                                     message = "Screenshot saved",
-                                    result = mapOf("path" to screenshotFile.absolutePath)
+                                    result = mapOf("path" to savedFile.absolutePath)
                                 )
                             )
                         }
@@ -298,18 +298,34 @@ class ControlServer(
                 }
             } else {
                 ScreenshotRecorder.saveScreenshot(directory, screenshotName, client.framebuffer) { _ ->
+                    val savedFile = normalizeScreenshotPath(directory, screenshotName)
                     future.complete(
                         ControlResponse(
                             id = request.id,
                             ok = true,
                             message = "Screenshot saved",
-                            result = mapOf("path" to screenshotFile.absolutePath)
+                            result = mapOf("path" to savedFile.absolutePath)
                         )
                     )
                 }
             }
         }
         return future.get(10, TimeUnit.SECONDS)
+    }
+
+    private fun normalizeScreenshotPath(directory: File, screenshotName: String): File {
+        val screenshotsDir = File(directory, "screenshots")
+        val rawFile = File(screenshotsDir, screenshotName)
+        val pngFile = File(screenshotsDir, "$screenshotName.png")
+
+        return when {
+            pngFile.exists() -> pngFile
+            rawFile.exists() -> {
+                Files.move(rawFile.toPath(), pngFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                pngFile
+            }
+            else -> pngFile
+        }
     }
 
     private fun waitForChat(request: ControlRequest): ControlResponse {

@@ -106,6 +106,41 @@ function syncDependencyJar(modsDir: string, jarPath: string): void {
   copyFileSync(jarPath, targetPath);
 }
 
+function writeAutomationOptions(minecraftDir: string): void {
+  const optionsPath = join(minecraftDir, "options.txt");
+  const existing = existsSync(optionsPath) ? readFileSync(optionsPath, "utf8") : "";
+  const values = new Map<string, string>();
+
+  for (const line of existing.split(/\r?\n/)) {
+    if (!line.includes(":")) {
+      continue;
+    }
+    const separator = line.indexOf(":");
+    const key = line.slice(0, separator);
+    const value = line.slice(separator + 1);
+    values.set(key, value);
+  }
+
+  const overrides: Record<string, string> = {
+    fullscreen: "true",
+    guiScale: "2",
+    onboardAccessibility: "false",
+    tutorialStep: "none",
+    pauseOnLostFocus: "false",
+    skipMultiplayerWarning: "true",
+    joinedFirstServer: "true",
+    overrideWidth: "0",
+    overrideHeight: "0"
+  };
+
+  for (const [key, value] of Object.entries(overrides)) {
+    values.set(key, value);
+  }
+
+  const lines = [...values.entries()].map(([key, value]) => `${key}:${value}`);
+  writeFileSync(optionsPath, `${lines.join("\n")}\n`, "utf8");
+}
+
 export async function ensurePrismInstance(
   root: string,
   client: ClientConfig,
@@ -157,6 +192,8 @@ export async function ensurePrismInstance(
   for (const jarPath of dependencyJars) {
     syncDependencyJar(modsDir, jarPath);
   }
+
+  writeAutomationOptions(minecraftDir);
 
   const groupFile = join(instanceRoot, "instgroups.json");
   if (!existsSync(groupFile)) {
