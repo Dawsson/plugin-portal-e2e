@@ -3,6 +3,7 @@ import { bootstrap } from "./commands/bootstrap.ts";
 import { clean } from "./commands/clean.ts";
 import { doctor } from "./commands/doctor.ts";
 import { inspectChat } from "./commands/inspect-chat.ts";
+import { publishLatest } from "./commands/publish.ts";
 import { runPreset } from "./commands/run.ts";
 import { verifyConfig, verifyMatrix } from "./commands/verify.ts";
 import { loadConfig } from "./lib/config.ts";
@@ -49,6 +50,7 @@ async function main(): Promise<void> {
       "  run",
       "  record",
       "  clean",
+      "  publish",
       "  inspect-chat",
       "  verify",
       "  verify-matrix",
@@ -88,6 +90,9 @@ async function main(): Promise<void> {
       return;
     case "inspect-chat":
       await inspectChat();
+      return;
+    case "publish":
+      await publishLatest(root, args.slice(1));
       return;
     case "verify":
       await verifyConfig(root, config);

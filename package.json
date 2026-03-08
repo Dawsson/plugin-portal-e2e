@@ -10,6 +10,7 @@
     "doctor": "bun run packages/cli/src/index.ts doctor",
     "bootstrap": "bun run packages/cli/src/index.ts bootstrap",
     "inspect-chat": "bun run packages/cli/src/index.ts inspect-chat",
+    "publish": "bun run packages/cli/src/index.ts publish",
     "typecheck": "tsc --noEmit",
     "run:quick-local": "bun run packages/cli/src/index.ts run --preset quick-local",
     "run:quick-prod": "bun run packages/cli/src/index.ts run --preset quick-prod",

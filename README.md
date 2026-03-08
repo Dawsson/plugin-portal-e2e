@@ -41,6 +41,7 @@ bun run verify:matrix
 bun run doctor
 bun run bootstrap
 bun run inspect-chat
+bun run publish
 bun run verify
 bun run typecheck
 bun run e2e help
@@ -67,6 +68,7 @@ Supported commands:
 - `bootstrap`
 - `verify`
 - `inspect-chat`
+- `publish`
 - `run`
 - `record`
 - `clean`
@@ -78,6 +80,7 @@ Important flags:
 - `--preset <name>`
 - `verify-matrix --only <csv>`
 - `verify-matrix --kind standalone|proxy`
+- `publish --file <path>`
 
 Built-in presets:
 
@@ -183,6 +186,8 @@ Each run creates a new folder under `artifacts/`:
 
 When the real client is already running, `bun run inspect-chat` dumps the latest captured chat lines and clickable targets. Use that to script `clickChat` flows without guessing the exact component text.
 
+`bun run publish` uploads the latest `video/composited.mp4` artifact to the configured CDN and posts the resulting CDN URL to the configured Discord webhook. Use `bun run publish -- --file <path>` to target a specific video file.
+
 Matrix runs also write:
 
 - `matrix-summary-<timestamp>.json`
@@ -196,6 +201,11 @@ Use ignored local files for machine-specific or sensitive overrides:
 - `.env.local`
 - `.e2e.local.json`
 - `.obs.local.json`
+
+Publishing uses these ignored local env vars:
+
+- `PP_E2E_CDN_ACCESS_TOKEN`
+- `PP_E2E_DISCORD_WEBHOOK_URL`
 
 Do not commit:
 
