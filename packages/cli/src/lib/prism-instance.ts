@@ -122,15 +122,21 @@ function writeAutomationOptions(minecraftDir: string): void {
   }
 
   const overrides: Record<string, string> = {
-    fullscreen: "true",
-    guiScale: "2",
+    fullscreen: "false",
+    guiScale: "4",
     onboardAccessibility: "false",
     tutorialStep: "none",
     pauseOnLostFocus: "false",
     skipMultiplayerWarning: "true",
     joinedFirstServer: "true",
-    overrideWidth: "0",
-    overrideHeight: "0"
+    overrideWidth: "1280",
+    overrideHeight: "720",
+    chatHeightFocused: "1.0",
+    chatHeightUnfocused: "1.0",
+    chatScale: "1.0",
+    chatWidth: "1.0",
+    textBackgroundOpacity: "0.5",
+    backgroundForChatOnly: "true"
   };
 
   for (const [key, value] of Object.entries(overrides)) {

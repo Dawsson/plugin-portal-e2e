@@ -2,6 +2,7 @@ package gg.flyte.pluginportal.e2e.client
 
 import com.google.gson.Gson
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.gui.screen.ChatScreen
 import net.minecraft.client.gui.screen.AccessibilityOnboardingScreen
 import net.minecraft.client.gui.screen.DeathScreen
 import net.minecraft.client.gui.screen.TitleScreen
@@ -267,6 +268,8 @@ class ControlServer(
             message = "Missing screenshot path"
         )
         val screenshotName = (request.name ?: "plugin-portal-e2e").removeSuffix(".png")
+        val screenshotDelayMs = request.delayMs ?: 1_500L
+        val openChat = request.openChat ?: false
         val directory = File(outputDir)
         directory.mkdirs()
         val future = CompletableFuture<ControlResponse>()
@@ -275,9 +278,12 @@ class ControlServer(
             if (client.player != null && client.world != null) {
                 prepareWorldView(client)
                 executor.submit {
-                    Thread.sleep(350)
+                    Thread.sleep(screenshotDelayMs)
                     client.execute {
                         prepareWorldView(client)
+                        if (openChat) {
+                            client.setScreen(ChatScreen(""))
+                        }
                         PluginPortalE2EClient.logger.info(
                             "Capturing screenshot {}, final screen: {}",
                             screenshotName,

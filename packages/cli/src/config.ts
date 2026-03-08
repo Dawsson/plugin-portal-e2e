@@ -8,7 +8,8 @@ const apiTargetSchema = z.object({
 const releaseSourceSchema = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("local-build"),
-    pluginRepoPath: z.string()
+    pluginRepoPath: z.string(),
+    variant: z.enum(["free", "premium"]).default("free")
   }),
   z.object({
     mode: z.literal("local-path"),
@@ -44,11 +45,17 @@ const stepSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("takeScreenshot"),
-    name: z.string()
+    name: z.string(),
+    delayMs: z.number().int().nonnegative().optional(),
+    openChat: z.boolean().optional()
   }),
   z.object({
     action: z.literal("clickChat"),
     text: z.string()
+  }),
+  z.object({
+    action: z.literal("delay"),
+    delayMs: z.number().int().nonnegative()
   })
 ]);
 
@@ -67,7 +74,8 @@ export const e2eConfigSchema = z.object({
     minecraftVersion: z.string(),
     prism: z.object({
       appPath: z.string(),
-      instanceName: z.string()
+      instanceName: z.string(),
+      profile: z.string().optional()
     })
   }),
   topology: z.object({
@@ -87,4 +95,3 @@ export type ScenarioStep = z.infer<typeof stepSchema>;
 export function defineConfig(config: E2EConfig): E2EConfig {
   return e2eConfigSchema.parse(config);
 }
-

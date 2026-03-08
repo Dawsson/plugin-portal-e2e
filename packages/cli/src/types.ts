@@ -4,6 +4,7 @@ export type ProxyFamily = "velocity" | "waterfall" | "bungeecord";
 export interface LocalBuildReleaseSource {
   mode: "local-build";
   pluginRepoPath: string;
+  variant?: "free" | "premium";
 }
 
 export interface LocalPathReleaseSource {
@@ -41,6 +42,7 @@ export interface ClientConfig {
   prism: {
     appPath: string;
     instanceName: string;
+    profile?: string;
   };
 }
 
@@ -51,11 +53,13 @@ export interface ServerNode {
 }
 
 export interface ScenarioStep {
-  action: "runCommand" | "waitForChat" | "takeScreenshot" | "clickChat";
+  action: "runCommand" | "waitForChat" | "takeScreenshot" | "clickChat" | "delay";
   value?: string;
   name?: string;
   text?: string;
   timeoutMs?: number;
+  delayMs?: number;
+  openChat?: boolean;
 }
 
 export interface Scenario {

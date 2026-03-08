@@ -49,8 +49,14 @@ const config = defineConfig({
           value: "/ppm"
         },
         {
+          action: "delay",
+          delayMs: 1500
+        },
+        {
           action: "takeScreenshot",
-          name: "ppm-help-screen"
+          name: "ppm-help-screen",
+          delayMs: 1500,
+          openChat: true
         }
       ]
     }

@@ -9,6 +9,8 @@ export interface ControlRequest {
   text?: string;
   path?: string;
   timeoutMs?: number;
+  delayMs?: number;
+  openChat?: boolean;
 }
 
 export interface ControlResponse {
@@ -59,4 +61,23 @@ export async function waitForClientReady(host: string, port: number, timeoutMs: 
   }
 
   throw new Error("Timed out waiting for the Minecraft client to join the test server");
+}
+
+export async function waitForClientMenu(host: string, port: number, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const response = await sendControlRequest(host, port, {
+      id: `menu-${Date.now()}`,
+      action: "ping"
+    });
+
+    if (response.ok && response.result?.screenClass) {
+      return;
+    }
+
+    await Bun.sleep(1_000);
+  }
+
+  throw new Error("Timed out waiting for the Minecraft client to reach a menu screen");
 }

@@ -8,7 +8,9 @@ data class ControlRequest(
     val name: String? = null,
     val text: String? = null,
     val path: String? = null,
-    val timeoutMs: Long? = null
+    val timeoutMs: Long? = null,
+    val delayMs: Long? = null,
+    val openChat: Boolean? = null
 )
 
 data class ControlResponse(
