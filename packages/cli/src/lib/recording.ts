@@ -116,21 +116,26 @@ function toAssTime(ms: number): string {
 function eventLabel(event: Record<string, unknown>): string | null {
   switch (event.type) {
     case "scenario.step.started":
-      return `Start ${String(event.action)}`
+      if (event.command) return `Start ${String(event.command)}`;
+      if (event.text) return `Start ${String(event.text)}`;
+      return `Start ${String(event.action)}`;
     case "scenario.step.finished":
-      return `${String(event.action)} ok`
+      if (event.command) return `Done ${String(event.command)}`;
+      if (event.text) return `Matched ${String(event.text)}`;
+      if (event.path) return `${String(event.action)} ${String(event.path)}`;
+      return `${String(event.action)} ok`;
     case "artifact.screenshot":
-      return `Screenshot ${String(event.path ?? "")}`
+      return `Screenshot ${String(event.path ?? "")}`;
     case "watch.fs":
-      return `${String(event.op)} ${String(event.scope)}/${String(event.path)}`
+      return `${String(event.op)} ${String(event.scope)}/${String(event.path)}`;
     case "recording.started":
-      return `Recording started (${String(event.provider)})`
+      return `Recording started (${String(event.provider)})`;
     case "recording.stopped":
-      return `Recording stopped`
+      return `Recording stopped`;
     case "run.finished":
-      return `Run ${event.ok ? "finished" : "failed"}`
+      return `Run ${event.ok ? "finished" : "failed"}`;
     default:
-      return null
+      return null;
   }
 }
 
