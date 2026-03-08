@@ -97,7 +97,6 @@ class ControlServer(
         )
 
         val client = MinecraftClient.getInstance()
-        val afterSequence = ChatCapture.snapshotSequence()
         val future = CompletableFuture<ControlResponse>()
         val visualize = request.visualize ?: true
         val beforeDelayMs = request.beforeDelayMs ?: 500L
@@ -126,22 +125,38 @@ class ControlServer(
                 }
 
                 client.execute {
-                    val networkHandler = client.networkHandler
-                    if (networkHandler == null) {
-                        future.complete(
-                            ControlResponse(
-                                id = request.id,
-                                ok = false,
-                                message = "Missing network handler"
+                    if (visualize) {
+                        val chatScreen = client.currentScreen as? ChatScreen
+                        if (chatScreen == null) {
+                            future.complete(
+                                ControlResponse(
+                                    id = request.id,
+                                    ok = false,
+                                    message = "Chat screen was not available for visible command entry"
+                                )
                             )
-                        )
-                        return@execute
-                    }
+                            return@execute
+                        }
 
-                    if (command.startsWith("/")) {
-                        networkHandler.sendChatCommand(command.removePrefix("/"))
+                        chatScreen.sendMessage(command, true)
                     } else {
-                        networkHandler.sendChatMessage(command)
+                        val networkHandler = client.networkHandler
+                        if (networkHandler == null) {
+                            future.complete(
+                                ControlResponse(
+                                    id = request.id,
+                                    ok = false,
+                                    message = "Missing network handler"
+                                )
+                            )
+                            return@execute
+                        }
+
+                        if (command.startsWith("/")) {
+                            networkHandler.sendChatCommand(command.removePrefix("/"))
+                        } else {
+                            networkHandler.sendChatMessage(command)
+                        }
                     }
                     PluginPortalE2EClient.logger.info("Dispatched command {}", command)
                 }
@@ -149,8 +164,8 @@ class ControlServer(
                 Thread.sleep(afterDelayMs)
 
                 client.execute {
-                    if (visualize) {
-                        client.setScreen(ChatScreen(""))
+                    if (visualize && client.currentScreen is ChatScreen) {
+                        client.setScreen(null)
                     }
                     future.complete(
                         ControlResponse(
@@ -159,7 +174,7 @@ class ControlServer(
                             message = "Command dispatched",
                             result = mapOf(
                                 "command" to command,
-                                "afterSequence" to afterSequence.toString()
+                                "afterSequence" to ChatCapture.snapshotSequence().toString()
                             )
                         )
                     )

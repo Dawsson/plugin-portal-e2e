@@ -72,7 +72,7 @@ const config = defineConfig({
         },
         {
           action: "delay",
-          delayMs: 2600
+          delayMs: 4200
         },
         {
           action: "runCommand",
