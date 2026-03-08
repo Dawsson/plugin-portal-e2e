@@ -1,0 +1,14 @@
+{
+  "id": "help",
+  "steps": [
+    {
+      "type": "command",
+      "value": "/pp help"
+    },
+    {
+      "type": "screenshot",
+      "label": "help-screen"
+    }
+  ]
+}
+

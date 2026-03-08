@@ -1,0 +1,22 @@
+{
+  "name": "plugin-portal-e2e",
+  "private": true,
+  "packageManager": "bun@1.3.9",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "e2e": "bun run packages/cli/src/index.ts",
+    "doctor": "bun run packages/cli/src/index.ts doctor",
+    "bootstrap": "bun run packages/cli/src/index.ts bootstrap",
+    "typecheck": "tsc --noEmit",
+    "run:quick-local": "bun run packages/cli/src/index.ts run --preset quick-local",
+    "run:quick-prod": "bun run packages/cli/src/index.ts run --preset quick-prod"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.2",
+    "bun-types": "^1.3.10",
+    "typescript": "^5.9.3",
+    "zod": "^3.24.2"
+  }
+}

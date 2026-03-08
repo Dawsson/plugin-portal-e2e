@@ -1,0 +1,13 @@
+{
+  "id": "view-plugin",
+  "steps": [
+    {
+      "type": "command",
+      "value": "/pp view ViaVersion HANGAR --byId"
+    },
+    {
+      "type": "screenshot",
+      "label": "view-plugin"
+    }
+  ]
+}

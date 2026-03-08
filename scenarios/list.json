@@ -1,0 +1,14 @@
+{
+  "id": "list",
+  "steps": [
+    {
+      "type": "command",
+      "value": "/pp list"
+    },
+    {
+      "type": "screenshot",
+      "label": "list-screen"
+    }
+  ]
+}
+

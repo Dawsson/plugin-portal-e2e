@@ -1,0 +1,23 @@
+.DS_Store
+.idea
+.vscode
+node_modules
+.gradle
+build
+dist
+coverage
+*.log
+
+# Local machine state
+.e2e.local.json
+.env.local
+.obs.local.json
+
+# Generated runtime state
+.state
+artifacts
+
+# Gradle wrapper caches in subprojects
+packages/client-mod/.gradle
+packages/client-mod/build
+
