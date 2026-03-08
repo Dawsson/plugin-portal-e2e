@@ -40,6 +40,7 @@ bun run verify:matrix
 ```bash
 bun run doctor
 bun run bootstrap
+bun run verify
 bun run typecheck
 bun run run:quick-local
 bun run run:quick-prod
@@ -60,6 +61,7 @@ Supported commands:
 
 - `doctor`
 - `bootstrap`
+- `verify`
 - `run`
 - `record`
 - `clean`
@@ -70,6 +72,25 @@ Important flags:
 - `--config <path>`
 - `verify-matrix --only <csv>`
 - `verify-matrix --kind standalone|proxy`
+
+## Custom Topologies
+
+You can validate an arbitrary topology directly with `verify` or `run`.
+
+Example:
+
+```bash
+bun run e2e verify --config e2e.config.proxy-two-paper.example.ts
+```
+
+Helper builders are exported from [config.ts](/Users/dawson/projects/plugin-portal/plugin-portal-e2e/packages/cli/src/config.ts):
+
+- `backendNode`
+- `proxyNode`
+- `createStandaloneTopology`
+- `createProxyTopology`
+
+The two-backend proxy example lives in [e2e.config.proxy-two-paper.example.ts](/Users/dawson/projects/plugin-portal/plugin-portal-e2e/e2e.config.proxy-two-paper.example.ts).
 
 ## Config
 

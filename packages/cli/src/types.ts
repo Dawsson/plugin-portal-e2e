@@ -106,7 +106,7 @@ export interface E2EConfig {
   cleanup: CleanupConfig;
   recording: RecordingConfig;
   topology: {
-    preset: "single-paper" | "paper-family" | "proxy-velocity" | "proxy-waterfall" | "proxy-bungeecord" | "full";
+    preset: "single-paper" | "paper-family" | "proxy-velocity" | "proxy-waterfall" | "proxy-bungeecord" | "full" | "custom";
     servers: ServerNode[];
   };
   watch: {

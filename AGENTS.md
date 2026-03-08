@@ -28,6 +28,7 @@ Run from this repo root:
 bun install
 bun run doctor
 bun run bootstrap
+bun run verify
 bun run run:quick-local
 bun run run:quick-prod
 bun run verify:matrix
@@ -50,6 +51,7 @@ Commands:
 - `run` executes a client-backed scenario run
 - `record` executes a client-backed scenario run with recording enabled
 - `clean` removes generated state and artifacts according to config
+- `verify` runs the current config as a server-only validation
 - `verify-matrix` runs server/proxy matrix verification without the Minecraft client
 
 Useful flags:
@@ -57,6 +59,18 @@ Useful flags:
 - `--config <path>` loads a specific config file
 - `verify-matrix --only <csv>` filters by family, project name, or service id
 - `verify-matrix --kind standalone|proxy` filters the matrix by topology class
+
+## Custom Topologies
+
+For non-matrix work, prefer a config file plus `verify`.
+
+Example:
+
+```bash
+bun run e2e verify --config e2e.config.proxy-two-paper.example.ts
+```
+
+Topology helper builders are exported from `packages/cli/src/config.ts`.
 
 ## Topology Terms
 

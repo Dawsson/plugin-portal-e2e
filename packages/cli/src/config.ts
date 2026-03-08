@@ -118,7 +118,7 @@ export const e2eConfigSchema = z.object({
     panelWidth: z.number().int().positive().default(480)
   }),
   topology: z.object({
-    preset: z.enum(["single-paper", "paper-family", "proxy-velocity", "proxy-waterfall", "proxy-bungeecord", "full"]),
+    preset: z.enum(["single-paper", "paper-family", "proxy-velocity", "proxy-waterfall", "proxy-bungeecord", "full", "custom"]),
     servers: z.array(serverSchema).min(1)
   }).superRefine((topology, ctx) => {
     const proxies = topology.servers.filter((server) =>
@@ -154,4 +154,41 @@ export type ScenarioStep = z.infer<typeof stepSchema>;
 
 export function defineConfig(config: E2EConfig): E2EConfig {
   return e2eConfigSchema.parse(config);
+}
+
+export function backendNode(
+  id: string,
+  family: "paper" | "purpur" | "pufferfish" | "spigot",
+  version: string
+): E2EConfig["topology"]["servers"][number] {
+  return { id, family, version };
+}
+
+export function proxyNode(
+  id: string,
+  family: "velocity" | "waterfall" | "bungeecord",
+  version: string,
+  backends: string[],
+  forwardingMode: "modern" | "legacy" = "legacy"
+): E2EConfig["topology"]["servers"][number] {
+  return { id, family, version, backends, forwardingMode };
+}
+
+export function createStandaloneTopology(
+  backend: E2EConfig["topology"]["servers"][number]
+): E2EConfig["topology"] {
+  return {
+    preset: "custom",
+    servers: [backend]
+  };
+}
+
+export function createProxyTopology(options: {
+  proxy: E2EConfig["topology"]["servers"][number];
+  backends: E2EConfig["topology"]["servers"][number][];
+}): E2EConfig["topology"] {
+  return {
+    preset: "custom",
+    servers: [...options.backends, options.proxy]
+  };
 }

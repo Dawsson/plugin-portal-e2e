@@ -3,7 +3,7 @@ import { bootstrap } from "./commands/bootstrap.ts";
 import { clean } from "./commands/clean.ts";
 import { doctor } from "./commands/doctor.ts";
 import { runPreset } from "./commands/run.ts";
-import { verifyMatrix } from "./commands/verify.ts";
+import { verifyConfig, verifyMatrix } from "./commands/verify.ts";
 import { loadConfig } from "./lib/config.ts";
 import { loadEnvFiles } from "./lib/env.ts";
 
@@ -50,6 +50,9 @@ async function main(): Promise<void> {
     }
     case "clean":
       await clean(root, config);
+      return;
+    case "verify":
+      await verifyConfig(root, config);
       return;
     case "verify-matrix":
       await verifyMatrix(root, config, readMatrixSelection(args));

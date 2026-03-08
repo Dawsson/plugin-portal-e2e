@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "run:quick-local": "bun run packages/cli/src/index.ts run --preset quick-local",
     "run:quick-prod": "bun run packages/cli/src/index.ts run --preset quick-prod",
+    "verify": "bun run packages/cli/src/index.ts verify",
     "verify:matrix": "bun run packages/cli/src/index.ts verify-matrix"
   },
   "devDependencies": {

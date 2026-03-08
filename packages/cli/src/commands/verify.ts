@@ -98,6 +98,14 @@ async function verifySingle(root: string, config: E2EConfig): Promise<{ projectN
   };
 }
 
+export async function verifyConfig(root: string, config: E2EConfig): Promise<void> {
+  const result = await verifySingle(root, config);
+  console.log(`Verification run: ${result.runRoot}`);
+  if (!result.ok) {
+    throw new Error(result.error ?? `Verification failed for ${config.projectName}`);
+  }
+}
+
 export async function verifyMatrix(root: string, baseConfig: E2EConfig, selection: MatrixSelection = {}): Promise<void> {
   const matrix = buildMatrixConfigs(baseConfig, selection);
   if (matrix.length === 0) {
