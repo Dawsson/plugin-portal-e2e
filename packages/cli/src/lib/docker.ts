@@ -41,6 +41,10 @@ function proxyTypeFor(family: ProxyFamily): string {
   }
 }
 
+function configuredApiKey(): string | null {
+  return process.env.PP_E2E_PLUGIN_PORTAL_API_KEY?.trim() || null;
+}
+
 function jvmOptsFor(config: E2EConfig, gatewayNetworkId: string): string {
   const options = [`-Dpluginportal.gatewayNetworkId=${gatewayNetworkId}`];
   if (config.apiTarget.mode !== "production") {
@@ -97,7 +101,9 @@ function proxyService(root: string, config: E2EConfig, node: ServerNode, release
   }
   const hostPort = config.topology.hostPort ?? 25565;
   const configMount = proxyConfigDir(root, config.projectName, node.id);
-  const volumes = [`      - ${configMount}:/config:ro`];
+  const pluginDataMount = resolve(root, ".state/runtime", node.id, "pluginportal");
+  ensureDir(pluginDataMount);
+  const volumes = [`      - ${configMount}:/config:ro`, `      - ${pluginDataMount}:/server/plugins/pluginportal`];
   const environment = [
     "    environment:",
     `      TYPE: ${proxyTypeFor(node.family)}`,
@@ -145,6 +151,44 @@ function writeBackendProxyConfig(root: string, config: E2EConfig): void {
       "  bungeecord: true"
     ].join("\n");
     Bun.write(join(runtimeRoot, "spigot.yml"), `${spigotConfig}\n`);
+  }
+}
+
+function writePluginPortalConfigs(root: string, config: E2EConfig): void {
+  const apiKey = configuredApiKey();
+
+  for (const node of config.topology.servers) {
+    if (isServerFamily(node.family)) {
+      const configPath = resolve(root, ".state/runtime", node.id, "plugins", "PluginPortal", "config.yml");
+      ensureDir(resolve(root, ".state/runtime", node.id, "plugins", "PluginPortal"));
+      const lines = [
+        "Gateway:",
+        "  Enabled: true",
+      ];
+      if (apiKey) {
+        lines.push("Authentication:");
+        lines.push(`  ApiKey: ${apiKey}`);
+      }
+      Bun.write(configPath, `${lines.join("\n")}\n`);
+      continue;
+    }
+
+    if (isProxyFamily(node.family)) {
+      const proxyDataRoot = resolve(root, ".state/runtime", node.id, "pluginportal");
+      ensureDir(proxyDataRoot);
+      const configPath = join(proxyDataRoot, "config.json");
+      const payload: Record<string, unknown> = {
+        Gateway: {
+          Enabled: true,
+        },
+      };
+      if (apiKey) {
+        payload.Authentication = {
+          ApiKey: apiKey,
+        };
+      }
+      Bun.write(configPath, `${JSON.stringify(payload, null, 2)}\n`);
+    }
   }
 }
 
@@ -227,6 +271,7 @@ export function writeComposeFile(root: string, config: E2EConfig, release: Resol
   const gatewayNetworkId = randomUUID();
   writeBackendProxyConfig(root, config);
   writeProxyConfigs(root, config);
+  writePluginPortalConfigs(root, config);
   const composePath = join(stateRoot, "docker-compose.yml");
   Bun.write(composePath, `${generateComposeYaml(root, config, release, gatewayNetworkId)}\n`);
   return composePath;
