@@ -223,7 +223,7 @@ export function writeComposeFile(root: string, config: E2EConfig, release: Resol
 }
 
 export function dockerComposeUp(composePath: string, root: string): void {
-  const result = runCommand(["docker", "compose", "-f", composePath, "up", "-d"], root);
+  const result = runCommand(["docker", "compose", "-f", composePath, "up", "-d", "--force-recreate"], root);
   if (!result.ok) {
     throw new Error(`docker compose up failed\n${result.stderr}`);
   }

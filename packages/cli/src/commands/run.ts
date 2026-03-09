@@ -23,36 +23,46 @@ function isBackendFamily(family: string): family is ServerFamily {
   return family === "paper" || family === "purpur" || family === "pufferfish" || family === "spigot";
 }
 
+function isProxyFamily(family: string): boolean {
+  return family === "velocity" || family === "waterfall" || family === "bungeecord";
+}
+
 function cleanServerRuntime(root: string, config: E2EConfig): void {
   for (const node of config.topology.servers) {
-    if (!isBackendFamily(node.family)) {
+    if (isBackendFamily(node.family)) {
+      const runtimeDir = resolve(root, ".state/runtime", node.id);
+      const pluginsDir = join(runtimeDir, "plugins");
+      const remappedDir = join(pluginsDir, ".paper-remapped");
+
+      if (existsSync(pluginsDir)) {
+        for (const entry of readdirSync(pluginsDir)) {
+          if ((entry.startsWith("PluginPortal") || entry.startsWith("[PP] ")) && entry.endsWith(".jar")) {
+            rmSync(join(pluginsDir, entry), { force: true });
+            continue;
+          }
+
+          const fullPath = join(pluginsDir, entry);
+          if (entry === ".paper-remapped") {
+            continue;
+          }
+
+          if (!entry.startsWith(".") && entry !== "PluginPortal" && existsSync(fullPath)) {
+            rmSync(fullPath, { recursive: true, force: true });
+          }
+        }
+      }
+
+      if (existsSync(remappedDir)) {
+        rmSync(remappedDir, { recursive: true, force: true });
+      }
       continue;
     }
 
-    const runtimeDir = resolve(root, ".state/runtime", node.id);
-    const pluginsDir = join(runtimeDir, "plugins");
-    const remappedDir = join(pluginsDir, ".paper-remapped");
-
-    if (existsSync(pluginsDir)) {
-      for (const entry of readdirSync(pluginsDir)) {
-        if ((entry.startsWith("PluginPortal") || entry.startsWith("[PP] ")) && entry.endsWith(".jar")) {
-          rmSync(join(pluginsDir, entry), { force: true });
-          continue;
-        }
-
-        const fullPath = join(pluginsDir, entry);
-        if (entry === ".paper-remapped") {
-          continue;
-        }
-
-        if (!entry.startsWith(".") && entry !== "PluginPortal" && existsSync(fullPath)) {
-          rmSync(fullPath, { recursive: true, force: true });
-        }
+    if (isProxyFamily(node.family)) {
+      const proxyPluginsDir = resolve(root, ".state/generated", config.projectName, "proxy", node.id, "plugins");
+      if (existsSync(proxyPluginsDir)) {
+        rmSync(proxyPluginsDir, { recursive: true, force: true });
       }
-    }
-
-    if (existsSync(remappedDir)) {
-      rmSync(remappedDir, { recursive: true, force: true });
     }
   }
 }
