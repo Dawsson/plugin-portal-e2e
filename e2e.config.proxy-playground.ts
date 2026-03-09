@@ -50,6 +50,7 @@ export default defineConfig({
       proxy: proxyNode("velocity-main", "velocity", "latest", backends.map((server) => server.id)),
     }),
     exposeHostPorts: true,
+    hostPort: 25566,
   },
   watch: {
     include: ["plugins/*.jar", "plugins/PluginPortal/**"],

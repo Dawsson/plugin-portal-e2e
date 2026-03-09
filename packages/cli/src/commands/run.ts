@@ -128,6 +128,8 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
   if (!primaryBackend) {
     throw new Error("No backend server is configured in the current topology");
   }
+  const hostPort = config.topology.hostPort ?? 25565;
+  const connectAddress = `127.0.0.1:${hostPort}`;
   await waitForServiceLog(
     composePath,
     root,
@@ -135,7 +137,7 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
     /Done \([^)]+\)! For help, type "help"/,
     180_000
   );
-  await waitForPort("127.0.0.1", 25565, 180_000);
+  await waitForPort("127.0.0.1", hostPort, 180_000);
   previousFrontApp = frontmostAppName();
   launchPrismClient(effectiveClientConfig);
   await waitForPort("127.0.0.1", 44712, 180_000);
@@ -155,7 +157,7 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
   const connectResponse = await sendControlRequest("127.0.0.1", 44712, {
     id: "connect",
     action: "connect",
-    address: "127.0.0.1:25565"
+    address: connectAddress
   });
   if (!connectResponse.ok) {
     throw new Error(connectResponse.message);

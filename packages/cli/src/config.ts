@@ -148,7 +148,8 @@ export const e2eConfigSchema = z.object({
   topology: z.object({
     preset: z.enum(["single-paper", "paper-family", "proxy-velocity", "proxy-waterfall", "proxy-bungeecord", "full", "custom"]),
     servers: z.array(serverSchema).min(1),
-    exposeHostPorts: z.boolean().default(true)
+    exposeHostPorts: z.boolean().default(true),
+    hostPort: z.number().int().min(1).max(65535).optional()
   }).superRefine((topology, ctx) => {
     const proxies = topology.servers.filter((server) =>
       server.family === "velocity" || server.family === "waterfall" || server.family === "bungeecord"
@@ -209,7 +210,8 @@ export function createStandaloneTopology(
   return {
     preset: "custom",
     servers: [backend],
-    exposeHostPorts: true
+    exposeHostPorts: true,
+    hostPort: 25565
   };
 }
 
@@ -220,6 +222,7 @@ export function createProxyTopology(options: {
   return {
     preset: "custom",
     servers: [...options.backends, options.proxy],
-    exposeHostPorts: true
+    exposeHostPorts: true,
+    hostPort: 25565
   };
 }

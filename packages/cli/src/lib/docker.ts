@@ -44,6 +44,7 @@ function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRe
   if (!isServerFamily(node.family)) {
     throw new Error(`Expected backend family, received ${node.family}`);
   }
+  const hostPort = config.topology.hostPort ?? 25565;
   const volumes = [
     `      - ${resolve(`.state/runtime/${node.id}`)}:/data`
   ];
@@ -76,7 +77,7 @@ function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRe
     `  ${node.id}:`,
     `    image: ${backendImageFor(node.family)}`,
     ...environment,
-    ...(exposeOnHost && config.topology.exposeHostPorts !== false ? ["    ports:", "      - \"25565:25565\""] : []),
+    ...(exposeOnHost && config.topology.exposeHostPorts !== false ? ["    ports:", `      - "${hostPort}:25565"`] : []),
     "    volumes:",
     ...volumes
   ].join("\n");
@@ -86,6 +87,7 @@ function proxyService(root: string, config: E2EConfig, node: ServerNode, release
   if (!isProxyFamily(node.family)) {
     throw new Error(`Expected proxy family, received ${node.family}`);
   }
+  const hostPort = config.topology.hostPort ?? 25565;
   const configMount = proxyConfigDir(root, config.projectName, node.id);
   const volumes = [`      - ${configMount}:/config:ro`];
   const environment = [
@@ -105,7 +107,7 @@ function proxyService(root: string, config: E2EConfig, node: ServerNode, release
     ...environment,
     ...(config.topology.exposeHostPorts === false
       ? []
-      : ["    ports:", ...(node.family === "velocity" ? ["      - \"25565:25565\""] : ["      - \"25565:25577\""])]),
+      : ["    ports:", ...(node.family === "velocity" ? [`      - "${hostPort}:25565"`] : [`      - "${hostPort}:25577"`])]),
     "    volumes:",
     ...volumes
   ].join("\n");
