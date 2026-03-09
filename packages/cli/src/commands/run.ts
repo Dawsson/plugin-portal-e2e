@@ -134,19 +134,21 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
   dockerComposeUp(composePath, root);
   composeLogs = startComposeLogCapture(composePath, root, artifacts, timeline);
   runtimeWatchers = await startRuntimeWatchers(root, config, timeline);
-  const primaryBackend = config.topology.servers.find((server) => isBackendFamily(server.family));
-  if (!primaryBackend) {
+  const backendServers = config.topology.servers.filter((server) => isBackendFamily(server.family));
+  if (backendServers.length === 0) {
     throw new Error("No backend server is configured in the current topology");
   }
   const hostPort = config.topology.hostPort ?? 25565;
   const connectAddress = `127.0.0.1:${hostPort}`;
-  await waitForServiceLog(
-    composePath,
-    root,
-    primaryBackend.id,
-    /Done \([^)]+\)! For help, type "help"/,
-    180_000
-  );
+  for (const backend of backendServers) {
+    await waitForServiceLog(
+      composePath,
+      root,
+      backend.id,
+      /Done \([^)]+\)! For help, type "help"/,
+      180_000
+    );
+  }
   await waitForPort("127.0.0.1", hostPort, 180_000);
   previousFrontApp = frontmostAppName();
   launchPrismClient(effectiveClientConfig);
