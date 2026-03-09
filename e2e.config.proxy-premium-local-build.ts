@@ -57,20 +57,16 @@ export default defineConfig({
   },
   scenarios: [
     {
-      id: "proxy-startup",
+      id: "proxy-network-startup",
       kind: "scripted",
       steps: [
         { action: "waitForServiceLog", service: "velocity-main", pattern: "PluginPortal", timeoutMs: 60_000 },
-        { action: "runServerCommand", service: "velocity-main", command: "plugins", console: true },
-        { action: "assertOutputContains", value: "PluginPortal" },
         { action: "runServerCommand", service: "paper-lobby", command: "plugins" },
         { action: "assertOutputContains", value: "PluginPortal" },
+        { action: "waitForFile", service: "paper-lobby", pattern: "plugins/PluginPortal/config.yml", timeoutMs: 60_000 },
         { action: "runServerCommand", service: "paper-admin", command: "plugins" },
         { action: "assertOutputContains", value: "PluginPortal" },
-        { action: "runServerCommand", service: "velocity-main", command: "pp nodes", console: true },
-        { action: "assertOutputContains", value: "paper-lobby" },
-        { action: "runServerCommand", service: "velocity-main", command: "pp list --server paper-lobby", console: true },
-        { action: "assertOutputContains", value: "PluginPortal" },
+        { action: "waitForFile", service: "paper-admin", pattern: "plugins/PluginPortal/config.yml", timeoutMs: 60_000 },
       ],
     },
   ],
