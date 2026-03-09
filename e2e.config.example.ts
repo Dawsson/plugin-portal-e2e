@@ -34,6 +34,7 @@ export default defineConfig({
   },
   topology: {
     preset: "single-paper",
+    exposeHostPorts: true,
     servers: [
       {
         id: "paper-main",

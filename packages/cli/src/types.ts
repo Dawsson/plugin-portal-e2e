@@ -116,6 +116,7 @@ export interface E2EConfig {
   topology: {
     preset: "single-paper" | "paper-family" | "proxy-velocity" | "proxy-waterfall" | "proxy-bungeecord" | "full" | "custom";
     servers: ServerNode[];
+    exposeHostPorts?: boolean;
   };
   watch: {
     include: string[];

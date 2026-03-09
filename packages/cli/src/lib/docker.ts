@@ -76,28 +76,38 @@ function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRe
     `  ${node.id}:`,
     `    image: ${backendImageFor(node.family)}`,
     ...environment,
-    ...(exposeOnHost ? ["    ports:", "      - \"25565:25565\""] : []),
+    ...(exposeOnHost && config.topology.exposeHostPorts !== false ? ["    ports:", "      - \"25565:25565\""] : []),
     "    volumes:",
     ...volumes
   ].join("\n");
 }
 
-function proxyService(root: string, config: E2EConfig, node: ServerNode): string {
+function proxyService(root: string, config: E2EConfig, node: ServerNode, release: ResolvedRelease): string {
   if (!isProxyFamily(node.family)) {
     throw new Error(`Expected proxy family, received ${node.family}`);
   }
   const configMount = proxyConfigDir(root, config.projectName, node.id);
-  return [
-    `  ${node.id}:`,
-    "    image: itzg/mc-proxy:latest",
+  const volumes = [`      - ${configMount}:/config:ro`];
+  const environment = [
     "    environment:",
     `      TYPE: ${proxyTypeFor(node.family)}`,
     "      ONLINE_MODE: \"FALSE\"",
-    "      REPLACE_ENV_VARIABLES: \"TRUE\"",
-    "    ports:",
-    ...(node.family === "velocity" ? ["      - \"25565:25565\""] : ["      - \"25565:25577\""]),
+    "      REPLACE_ENV_VARIABLES: \"TRUE\""
+  ];
+  if (release.kind === "url") {
+    environment.push(`      PLUGINS: ${release.value}`);
+  } else {
+    volumes.push(`      - ${release.value}:/plugins/${release.filename}:ro`);
+  }
+  return [
+    `  ${node.id}:`,
+    "    image: itzg/mc-proxy:latest",
+    ...environment,
+    ...(config.topology.exposeHostPorts === false
+      ? []
+      : ["    ports:", ...(node.family === "velocity" ? ["      - \"25565:25565\""] : ["      - \"25565:25577\""])]),
     "    volumes:",
-    `      - ${configMount}:/config:ro`
+    ...volumes
   ].join("\n");
 }
 
@@ -190,7 +200,7 @@ export function generateComposeYaml(root: string, config: E2EConfig, release: Re
     if (isServerFamily(server.family)) {
       services.push(backendService(server, config, release, !hasProxy && index === 0));
     } else if (isProxyFamily(server.family)) {
-      services.push(proxyService(root, config, server));
+      services.push(proxyService(root, config, server, release));
     }
   }
   return [

@@ -12,7 +12,6 @@ import { startRuntimeWatchers } from "../lib/watch.ts";
 import { runServerScenarios } from "../lib/server-scenario.ts";
 import { buildMatrixConfigs, type MatrixSelection } from "../lib/matrix.ts";
 import { renderExplorerSnapshot } from "../lib/explorer.ts";
-import { waitForPort } from "../lib/wait.ts";
 
 function isBackendFamily(family: string): family is ServerFamily {
   return family === "paper" || family === "purpur" || family === "pufferfish" || family === "spigot";
@@ -98,7 +97,6 @@ async function verifySingle(root: string, config: E2EConfig): Promise<{ projectN
       await waitForServiceLog(composePath, root, proxy.id, proxyReadyPattern(proxy.family), 60_000);
     }
 
-    await waitForPort("127.0.0.1", 25565, 30_000);
     await runServerScenarios(root, composePath, config, artifacts, timeline);
     timeline.write({ type: "run.finished", ok: true });
   } catch (caught) {
