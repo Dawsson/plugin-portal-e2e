@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
 import type { E2EConfig, ProxyFamily, ServerFamily, ServerNode } from "../types.ts";
 import { ensureDir } from "./fs.ts";
@@ -40,7 +41,16 @@ function proxyTypeFor(family: ProxyFamily): string {
   }
 }
 
-function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRelease, exposeOnHost: boolean): string {
+function jvmOptsFor(config: E2EConfig, gatewayNetworkId: string): string {
+  const options = [`-Dpluginportal.gatewayNetworkId=${gatewayNetworkId}`];
+  if (config.apiTarget.mode !== "production") {
+    options.push(`-Dpluginportal.baseUrl=${config.apiTarget.baseUrl}`);
+    options.push(`-Dpluginportal.wsBaseUrl=${config.apiTarget.baseUrl.replace("https://", "wss://").replace("http://", "ws://")}`);
+  }
+  return options.join(" ");
+}
+
+function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRelease, exposeOnHost: boolean, gatewayNetworkId: string): string {
   if (!isServerFamily(node.family)) {
     throw new Error(`Expected backend family, received ${node.family}`);
   }
@@ -60,13 +70,11 @@ function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRe
     "      ENABLE_RCON: \"TRUE\"",
     "      CREATE_CONSOLE_IN_PIPE: \"TRUE\"",
     "      RCON_PASSWORD: \"plugin-portal-e2e\"",
-    "      MEMORY: 2G"
+    "      MEMORY: 2G",
+    `      JVM_OPTS: ${jvmOptsFor(config, gatewayNetworkId)}`
   ];
   if (config.topology.servers.some((candidate) => isProxyFamily(candidate.family) && (candidate.backends ?? []).includes(node.id))) {
     environment.push("      OVERRIDE_SERVER_PROPERTIES: true");
-  }
-  if (config.apiTarget.mode !== "production") {
-    environment.push(`      JVM_DD_OPTS: -Dpluginportal.baseUrl=${config.apiTarget.baseUrl} -Dpluginportal.wsBaseUrl=${config.apiTarget.baseUrl.replace("https://", "wss://").replace("http://", "ws://")}`)
   }
   if (release.kind === "url") {
     environment.push(`      PLUGINS: ${release.value}`)
@@ -83,7 +91,7 @@ function backendService(node: ServerNode, config: E2EConfig, release: ResolvedRe
   ].join("\n");
 }
 
-function proxyService(root: string, config: E2EConfig, node: ServerNode, release: ResolvedRelease): string {
+function proxyService(root: string, config: E2EConfig, node: ServerNode, release: ResolvedRelease, gatewayNetworkId: string): string {
   if (!isProxyFamily(node.family)) {
     throw new Error(`Expected proxy family, received ${node.family}`);
   }
@@ -94,7 +102,8 @@ function proxyService(root: string, config: E2EConfig, node: ServerNode, release
     "    environment:",
     `      TYPE: ${proxyTypeFor(node.family)}`,
     "      ONLINE_MODE: \"FALSE\"",
-    "      REPLACE_ENV_VARIABLES: \"TRUE\""
+    "      REPLACE_ENV_VARIABLES: \"TRUE\"",
+    `      JVM_OPTS: ${jvmOptsFor(config, gatewayNetworkId)}`
   ];
   if (release.kind === "url") {
     environment.push(`      PLUGINS: ${release.value}`);
@@ -195,14 +204,14 @@ function writeProxyConfigs(root: string, config: E2EConfig): void {
   }
 }
 
-export function generateComposeYaml(root: string, config: E2EConfig, release: ResolvedRelease): string {
+export function generateComposeYaml(root: string, config: E2EConfig, release: ResolvedRelease, gatewayNetworkId: string): string {
   const services: string[] = [];
   const hasProxy = config.topology.servers.some((server) => isProxyFamily(server.family));
   for (const [index, server] of config.topology.servers.entries()) {
     if (isServerFamily(server.family)) {
-      services.push(backendService(server, config, release, !hasProxy && index === 0));
+      services.push(backendService(server, config, release, !hasProxy && index === 0, gatewayNetworkId));
     } else if (isProxyFamily(server.family)) {
-      services.push(proxyService(root, config, server, release));
+      services.push(proxyService(root, config, server, release, gatewayNetworkId));
     }
   }
   return [
@@ -215,10 +224,11 @@ export function writeComposeFile(root: string, config: E2EConfig, release: Resol
   const stateRoot = resolve(root, ".state/generated", config.projectName);
   ensureDir(stateRoot);
   ensureDir(resolve(root, ".state/runtime"));
+  const gatewayNetworkId = randomUUID();
   writeBackendProxyConfig(root, config);
   writeProxyConfigs(root, config);
   const composePath = join(stateRoot, "docker-compose.yml");
-  Bun.write(composePath, `${generateComposeYaml(root, config, release)}\n`);
+  Bun.write(composePath, `${generateComposeYaml(root, config, release, gatewayNetworkId)}\n`);
   return composePath;
 }
 

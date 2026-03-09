@@ -14,8 +14,8 @@ export default defineConfig({
   projectName: "plugin-portal-proxy-playground",
   artifactsDir: "artifacts",
   apiTarget: {
-    mode: "production",
-    baseUrl: "https://v4.pluginportal.link",
+    mode: "local",
+    baseUrl: process.env.PP_E2E_API_LOCAL_URL ?? "http://host.docker.internal:3001",
   },
   releaseSource: {
     mode: "local-build",
@@ -27,7 +27,7 @@ export default defineConfig({
     prism: {
       appPath: process.env.PP_E2E_PRISM_APP_PATH ?? "/Applications/Prism Launcher.app/Contents/MacOS/prismlauncher",
       instanceName: "plugin-portal-e2e-1.21.4",
-      profile: "Dawsson",
+      profile: "dawsson",
     },
     macos: {
       launchMode: "foreground",
