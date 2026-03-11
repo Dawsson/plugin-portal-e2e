@@ -36,7 +36,7 @@ export default defineConfig({
         { action: "waitForFileChange", service: "paper-main", pattern: "plugins/PluginPortal/plugins.json", timeoutMs: 60_000 },
         { action: "delay", delayMs: 1_000 },
 
-        { action: "restartService", service: "paper-main", timeoutMs: 180_000 },
+        { action: "restartService", service: "paper-main", timeoutMs: 180_000, waitForReady: false },
         { action: "connectClient", timeoutMs: 180_000 },
         { action: "delay", delayMs: 1_000 },
 
@@ -54,7 +54,7 @@ export default defineConfig({
         { action: "waitForFile", service: "paper-main", pattern: "plugins/ViaVersion-5.7.3-SNAPSHOT.jar", timeoutMs: 60_000 },
         { action: "delay", delayMs: 1_000 },
 
-        { action: "restartService", service: "paper-main", timeoutMs: 180_000 },
+        { action: "restartService", service: "paper-main", timeoutMs: 180_000, waitForReady: false },
         { action: "connectClient", timeoutMs: 180_000 },
         { action: "delay", delayMs: 1_000 },
 
@@ -65,7 +65,7 @@ export default defineConfig({
         { action: "waitForFile", service: "paper-main", pattern: "plugins/ViaVersion-5.3.1.jar", timeoutMs: 60_000 },
         { action: "delay", delayMs: 1_000 },
 
-        { action: "restartService", service: "paper-main", timeoutMs: 180_000 },
+        { action: "restartService", service: "paper-main", timeoutMs: 180_000, waitForReady: false },
         { action: "connectClient", timeoutMs: 180_000 },
         { action: "delay", delayMs: 1_000 },
 

@@ -287,6 +287,18 @@ export async function runServerScenarios(
         const service = step.service ?? "paper-main";
         const restartStartedAt = new Date();
         dockerComposeRestart(composePath, root, service);
+        if (step.waitForReady === false) {
+          timeline.write({
+            type: "scenario.step.finished",
+            scenario: scenario.id,
+            stepIndex: index,
+            action: step.action,
+            ok: true,
+            service,
+            waitForReady: false
+          });
+          continue;
+        }
         await waitForServiceLog(
           composePath,
           root,

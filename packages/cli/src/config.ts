@@ -116,7 +116,8 @@ const stepSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("restartService"),
     service: z.string(),
-    timeoutMs: z.number().int().positive().optional()
+    timeoutMs: z.number().int().positive().optional(),
+    waitForReady: z.boolean().optional()
   })
 ]);
 

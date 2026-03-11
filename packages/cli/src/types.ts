@@ -100,6 +100,7 @@ export interface ScenarioStep {
   service?: string;
   command?: string;
   console?: boolean;
+  waitForReady?: boolean;
   pattern?: string;
   path?: string;
 }

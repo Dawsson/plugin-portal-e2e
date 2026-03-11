@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { appendFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { ArtifactPaths } from "./artifacts.ts";
-import { sendControlRequest, waitForClientMenu, waitForClientReady } from "./control.ts";
+import { ensureClientConnected, sendControlRequest, waitForClientMenu } from "./control.ts";
 import { dockerComposeRestart, waitForServiceLog } from "./docker.ts";
 import { runConsoleCommand, runRconCommand } from "./rcon.ts";
 import type { E2EConfig } from "../types.ts";
@@ -138,15 +138,7 @@ export async function runScenarios(
         const hostPort = config.topology.hostPort ?? 25565;
         const address = step.address ?? `127.0.0.1:${hostPort}`;
         await waitForClientMenu("127.0.0.1", 44712, step.timeoutMs ?? 30_000);
-        const response = await sendControlRequest("127.0.0.1", 44712, {
-          id,
-          action: "connect",
-          address
-        });
-        if (!response.ok) {
-          throw new Error(response.message);
-        }
-        await waitForClientReady("127.0.0.1", 44712, step.timeoutMs ?? 180_000);
+        await ensureClientConnected("127.0.0.1", 44712, address, step.timeoutMs ?? 180_000);
         const resumeResponse = await sendControlRequest("127.0.0.1", 44712, {
           id: `${id}-resume`,
           action: "resumeGame"
@@ -315,6 +307,17 @@ export async function runScenarios(
         const service = step.service ?? "paper-main";
         const restartStartedAt = new Date();
         dockerComposeRestart(context.composePath, context.root, service);
+        if (step.waitForReady === false) {
+          hooks.onStepFinished?.({
+            scenario: scenario.id,
+            stepIndex: index,
+            action: step.action,
+            ok: true,
+            service,
+            waitForReady: false
+          });
+          continue;
+        }
         await waitForServiceLog(
           context.composePath,
           context.root,

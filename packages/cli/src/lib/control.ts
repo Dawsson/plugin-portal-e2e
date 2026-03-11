@@ -68,6 +68,52 @@ export async function waitForClientReady(host: string, port: number, timeoutMs: 
   throw new Error("Timed out waiting for the Minecraft client to join the test server");
 }
 
+export async function ensureClientConnected(
+  host: string,
+  port: number,
+  address: string,
+  timeoutMs: number
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let lastConnectAttempt = 0;
+
+  while (Date.now() < deadline) {
+    const response = await sendControlRequest(host, port, {
+      id: `connect-ping-${Date.now()}`,
+      action: "ping"
+    });
+
+    if (
+      response.ok &&
+      response.result?.playerPresent === "true" &&
+      response.result?.worldLoaded === "true"
+    ) {
+      return;
+    }
+
+    const screenClass = response.result?.screenClass ?? "";
+    const now = Date.now();
+    const isConnecting = screenClass.includes("ConnectScreen");
+    const canReconnect = !isConnecting && now - lastConnectAttempt >= 1_500;
+
+    if (response.ok && canReconnect) {
+      const connectResponse = await sendControlRequest(host, port, {
+        id: `connect-${now}`,
+        action: "connect",
+        address
+      });
+      if (!connectResponse.ok) {
+        throw new Error(connectResponse.message);
+      }
+      lastConnectAttempt = now;
+    }
+
+    await Bun.sleep(isConnecting ? 300 : 500);
+  }
+
+  throw new Error("Timed out waiting for the Minecraft client to join the test server");
+}
+
 export async function waitForClientMenu(host: string, port: number, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
 

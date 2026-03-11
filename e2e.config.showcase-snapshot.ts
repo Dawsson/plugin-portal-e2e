@@ -20,7 +20,7 @@ export default defineConfig({
         { action: "delay", delayMs: 850 },
         { action: "runServerCommand", service: "paper-main", command: `pp install-url ${viaVersionSnapshotUrl}`, console: true },
         { action: "waitForFile", service: "paper-main", pattern: "plugins/ViaVersion-5.7.3-SNAPSHOT.jar", timeoutMs: 60_000 },
-        { action: "restartService", service: "paper-main", timeoutMs: 180_000 },
+        { action: "restartService", service: "paper-main", timeoutMs: 180_000, waitForReady: false },
         { action: "connectClient", timeoutMs: 180_000 },
         { action: "delay", delayMs: 700 },
         { action: "runCommand", value: "/plugins", beforeDelayMs: 100, afterDelayMs: 240 },

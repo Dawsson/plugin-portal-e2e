@@ -22,7 +22,7 @@ export default defineConfig({
         { action: "runServerCommand", service: "paper-main", command: "pp install P1OZGk5p MODRINTH --byId", console: true },
         { action: "waitForFile", service: "paper-main", pattern: "plugins/*ViaVersion*.jar", timeoutMs: 60_000 },
         { action: "waitForFileChange", service: "paper-main", pattern: "plugins/PluginPortal/plugins.json", timeoutMs: 60_000 },
-        { action: "restartService", service: "paper-main", timeoutMs: 180_000 },
+        { action: "restartService", service: "paper-main", timeoutMs: 180_000, waitForReady: false },
         { action: "connectClient", timeoutMs: 180_000 },
         { action: "delay", delayMs: 700 },
         { action: "runCommand", value: "/pp list", beforeDelayMs: 100, afterDelayMs: 260 },
