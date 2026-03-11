@@ -100,7 +100,7 @@ async function startNativeRecording(
   };
 }
 
-function escapeAss(value: string): string {
+function escapeAssText(value: string): string {
   return value.replaceAll("\\", "\\\\").replaceAll("{", "\\{").replaceAll("}", "\\}").replaceAll("\n", "\\N");
 }
 
@@ -116,27 +116,55 @@ function toAssTime(ms: number): string {
 function eventLabel(event: Record<string, unknown>): string | null {
   switch (event.type) {
     case "scenario.step.started":
-      if (event.command) return `Start ${String(event.command)}`;
-      if (event.text) return `Start ${String(event.text)}`;
-      return `Start ${String(event.action)}`;
+      if (event.command) return `CMD ${String(event.command)}`;
+      if (event.text) return `WAIT ${String(event.text)}`;
+      return `STEP ${String(event.action)}`;
     case "scenario.step.finished":
-      if (event.command) return `Done ${String(event.command)}`;
-      if (event.text) return `Matched ${String(event.text)}`;
+      if (event.command) return `DONE ${String(event.command)}`;
+      if (event.text) return `MATCH ${String(event.text)}`;
       if (event.path) return `${String(event.action)} ${String(event.path)}`;
-      return `${String(event.action)} ok`;
+      return `OK ${String(event.action)}`;
     case "artifact.screenshot":
-      return `Screenshot ${String(event.path ?? "")}`;
+      return "SHOT saved";
     case "watch.fs":
-      return `${String(event.op)} ${String(event.scope)}/${String(event.path)}`;
+      return `FILE ${String(event.op)} ${String(event.path)}`;
     case "recording.started":
-      return `Recording started (${String(event.provider)})`;
+      return `REC ${String(event.provider)}`;
     case "recording.stopped":
-      return `Recording stopped`;
+      return "REC stopped";
     case "run.finished":
-      return `Run ${event.ok ? "finished" : "failed"}`;
+      return `RUN ${event.ok ? "complete" : "failed"}`;
     default:
       return null;
   }
+}
+
+function formatElapsed(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1_000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function shortenMiddle(value: string, max = 44): string {
+  if (value.length <= max) {
+    return value;
+  }
+
+  const head = Math.max(12, Math.floor((max - 3) / 2));
+  const tail = Math.max(10, max - head - 3);
+  return `${value.slice(0, head)}...${value.slice(-tail)}`;
+}
+
+function dialogueLine(
+  style: string,
+  startMs: number,
+  endMs: number,
+  x: number,
+  y: number,
+  text: string
+): string {
+  return `Dialogue: 0,${toAssTime(startMs)},${toAssTime(endMs)},${style},,0,0,0,,{\\pos(${x},${y})}${text}`;
 }
 
 export function composeRunVideo(
@@ -174,13 +202,44 @@ export function composeRunVideo(
   const timelinePath = join(artifacts.data, "timeline.jsonl");
   const assPath = join(artifacts.video, "panel.ass");
   const outputPath = join(artifacts.video, "composited.mp4");
+  const uiScale = Math.min(1.6, Math.max(1, height / 900));
+  const panelPadding = Math.round(18 * uiScale);
+  const panelX = width + panelPadding;
+  const panelInnerWidth = config.recording.panelWidth - panelPadding * 2;
+  const heroHeight = Math.round(104 * uiScale);
+  const filesCardY = heroHeight + Math.round(30 * uiScale);
+  const filesCardHeight = Math.max(Math.round(316 * uiScale), Math.round(height * 0.27));
+  const recentCardY = filesCardY + filesCardHeight + Math.round(12 * uiScale);
+  const recentCardHeight = Math.max(Math.round(320 * uiScale), height - recentCardY - panelPadding);
+  const titleY = Math.round(40 * uiScale);
+  const subtitleY = Math.round(72 * uiScale);
+  const statsY = Math.round(95 * uiScale);
+  const filesHeadingY = filesCardY + Math.round(28 * uiScale);
+  const recentHeadingY = recentCardY + Math.round(28 * uiScale);
+  const fileStartY = filesCardY + Math.round(70 * uiScale);
+  const recentStartY = recentCardY + Math.round(68 * uiScale);
+  const rowHeight = Math.round(42 * uiScale);
+  const statusX = panelX + Math.round(14 * uiScale);
+  const fileTextX = panelX + Math.round(74 * uiScale);
+  const fileMetaX = panelX + panelInnerWidth - Math.round(10 * uiScale);
+  const recentTimeX = panelX + Math.round(14 * uiScale);
+  const recentTextX = panelX + Math.round(96 * uiScale);
   const events = readFileSync(timelinePath, "utf8")
     .split(/\r?\n/)
     .filter(Boolean)
     .map((line) => JSON.parse(line) as Record<string, unknown>)
     .filter((event) => event.type !== "service.log");
-
-  const fileState = new Map<string, string>();
+  const fileState = new Map<
+    string,
+    {
+      key: string;
+      op: string;
+      scope: string;
+      path: string;
+      sizeLabel: string;
+      tMs: number;
+    }
+  >();
   const sections = [
     "[Script Info]",
     `PlayResX: ${width + config.recording.panelWidth}`,
@@ -189,13 +248,22 @@ export function composeRunVideo(
     "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Panel,Menlo,21,&H00E7E5E4,&H000000FF,&H00131212,&HD0131212,0,0,0,0,100,100,0,0,1,1,0,7,${width + 28},28,28,1`,
+    `Style: Kicker,Avenir Next Demi Bold,${Math.round(13 * uiScale)},&H008B949E,&H000000FF,&H000D1117,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`,
+    `Style: Title,Avenir Next Demi Bold,${Math.round(24 * uiScale)},&H00C9D1D9,&H000000FF,&H000D1117,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`,
+    `Style: Subtitle,Avenir Next Regular,${Math.round(14 * uiScale)},&H008B949E,&H000000FF,&H000D1117,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`,
+    `Style: Section,Avenir Next Demi Bold,${Math.round(16 * uiScale)},&H00C9D1D9,&H000000FF,&H000D1117,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`,
+    `Style: Meta,SF Mono,${Math.round(12 * uiScale)},&H008B949E,&H000000FF,&H000D1117,&H00000000,0,0,0,0,100,100,0,0,1,0,0,9,0,0,0,1`,
+    `Style: FileStatus,SF Mono,${Math.round(12 * uiScale)},&H00C9D1D9,&H000000FF,&H000D1117,&H00000000,1,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`,
+    `Style: FileText,Avenir Next Demi Bold,${Math.round(15 * uiScale)},&H00C9D1D9,&H000000FF,&H000D1117,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`,
+    `Style: FileMeta,SF Mono,${Math.round(12 * uiScale)},&H008B949E,&H000000FF,&H000D1117,&H00000000,0,0,0,0,100,100,0,0,1,0,0,9,0,0,0,1`,
+    `Style: EventTime,SF Mono,${Math.round(12 * uiScale)},&H008B949E,&H000000FF,&H000D1117,&H00000000,1,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`,
+    `Style: EventText,Avenir Next Regular,${Math.round(14 * uiScale)},&H00C9D1D9,&H000000FF,&H000D1117,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
   ];
 
-  let previousText = "";
+  let previousState = "";
   let segmentStart = 0;
 
   for (let sample = 0; sample <= durationMs + 500; sample += 500) {
@@ -209,49 +277,185 @@ export function composeRunVideo(
         if (event.op === "remove") {
           fileState.delete(key);
         } else {
-          fileState.set(key, key);
+          fileState.set(key, {
+            key,
+            op: String(event.op),
+            scope: String(event.scope),
+            path: String(event.path),
+            sizeLabel: typeof event.size === "number" ? `${Math.max(1, Math.round(Number(event.size) / 1024))} KB` : "--",
+            tMs
+          });
         }
       }
     }
 
     const recent = events
       .filter((event) => Number(event.tMs ?? 0) <= sample)
-      .map(eventLabel)
-      .filter((value): value is string => Boolean(value))
+      .map((event) => {
+        const label = eventLabel(event);
+        if (!label) {
+          return null;
+        }
+
+        return {
+          label: shortenMiddle(label, 46),
+          at: formatElapsed(Number(event.tMs ?? 0))
+        };
+      })
+      .filter((value): value is { label: string; at: string } => Boolean(value))
       .slice(-6);
 
-    const files = [...fileState.values()].slice(-6);
-    const text = escapeAss([
-      "Plugin Portal E2E",
-      "",
-      "Files",
-      ...(files.length ? files : ["(none)"]),
-      "",
-      "Recent",
-      ...(recent.length ? recent : ["(no events yet)"])
-    ].join("\n"));
+    const files = [...fileState.values()]
+      .sort((left, right) => right.tMs - left.tMs)
+      .slice(0, 5)
+      .map((file) => ({
+        status: file.op.toUpperCase(),
+        path: shortenMiddle(file.path, 34),
+        scope: shortenMiddle(file.scope, 12),
+        sizeLabel: file.sizeLabel
+      }));
 
-    if (text === previousText) {
+    const state = JSON.stringify({
+      elapsed: formatElapsed(sample),
+      fileCount: fileState.size,
+      eventCount: events.filter((event) => Number(event.tMs ?? 0) <= sample && eventLabel(event)).length,
+      files,
+      recent
+    });
+
+    if (state === previousState) {
       continue;
     }
 
-    if (previousText) {
-      sections.push(`Dialogue: 0,${toAssTime(segmentStart)},${toAssTime(sample)},Panel,,0,0,0,,${previousText}`);
+    if (previousState) {
+      const snapshot = JSON.parse(previousState) as {
+        elapsed: string;
+        fileCount: number;
+        eventCount: number;
+        files: Array<{ status: string; path: string; scope: string; sizeLabel: string }>;
+        recent: Array<{ label: string; at: string }>;
+      };
+      const endMs = sample;
+
+      sections.push(dialogueLine("Kicker", segmentStart, endMs, panelX, titleY - Math.round(18 * uiScale), "RUNTIME SIDEBAR"));
+      sections.push(dialogueLine("Title", segmentStart, endMs, panelX, titleY, "Plugin Portal E2E"));
+      sections.push(
+        dialogueLine(
+          "Subtitle",
+          segmentStart,
+          endMs,
+          panelX,
+          subtitleY,
+          `Files ${String(snapshot.fileCount).padStart(2, "0")}  |  Events ${String(snapshot.eventCount).padStart(2, "0")}  |  Elapsed ${snapshot.elapsed}`
+        )
+      );
+      sections.push(dialogueLine("Meta", segmentStart, endMs, panelX + panelInnerWidth, statsY, "github-dark"));
+      sections.push(dialogueLine("Section", segmentStart, endMs, panelX, filesHeadingY, "Tracked Files"));
+
+      if (snapshot.files.length === 0) {
+        sections.push(dialogueLine("EventText", segmentStart, endMs, panelX, fileStartY, "No watched file changes yet."));
+      } else {
+        snapshot.files.forEach((file, index) => {
+          const y = fileStartY + index * rowHeight;
+          const statusText = file.status.padEnd(6, " ");
+          sections.push(
+            dialogueLine(
+              "FileStatus",
+              segmentStart,
+              endMs,
+              statusX,
+              y,
+              escapeAssText(statusText)
+            )
+          );
+          sections.push(dialogueLine("FileText", segmentStart, endMs, fileTextX, y, escapeAssText(file.path)));
+          sections.push(
+            dialogueLine(
+              "FileMeta",
+              segmentStart,
+              endMs,
+              fileMetaX,
+              y,
+              escapeAssText(`${file.scope}  ${file.sizeLabel}`)
+            )
+          );
+        });
+      }
+
+      sections.push(dialogueLine("Section", segmentStart, endMs, panelX, recentHeadingY, "Recent Activity"));
+      if (snapshot.recent.length === 0) {
+        sections.push(dialogueLine("EventText", segmentStart, endMs, panelX, recentStartY, "Waiting for scenario activity."));
+      } else {
+        snapshot.recent.forEach((entry, index) => {
+          const y = recentStartY + index * rowHeight;
+          sections.push(dialogueLine("EventTime", segmentStart, endMs, recentTimeX, y, escapeAssText(entry.at)));
+          sections.push(dialogueLine("EventText", segmentStart, endMs, recentTextX, y, escapeAssText(entry.label)));
+        });
+      }
     }
 
-    previousText = text;
+    previousState = state;
     segmentStart = sample;
   }
 
-  if (previousText) {
-    sections.push(`Dialogue: 0,${toAssTime(segmentStart)},${toAssTime(durationMs + 500)},Panel,,0,0,0,,${previousText}`);
+  if (previousState) {
+    const snapshot = JSON.parse(previousState) as {
+      elapsed: string;
+      fileCount: number;
+      eventCount: number;
+      files: Array<{ status: string; path: string; scope: string; sizeLabel: string }>;
+      recent: Array<{ label: string; at: string }>;
+    };
+    const endMs = durationMs + 500;
+    sections.push(dialogueLine("Kicker", segmentStart, endMs, panelX, titleY - Math.round(18 * uiScale), "RUNTIME SIDEBAR"));
+    sections.push(dialogueLine("Title", segmentStart, endMs, panelX, titleY, "Plugin Portal E2E"));
+    sections.push(
+      dialogueLine(
+        "Subtitle",
+        segmentStart,
+        endMs,
+        panelX,
+        subtitleY,
+        `Files ${String(snapshot.fileCount).padStart(2, "0")}  |  Events ${String(snapshot.eventCount).padStart(2, "0")}  |  Elapsed ${snapshot.elapsed}`
+      )
+    );
+    sections.push(dialogueLine("Meta", segmentStart, endMs, panelX + panelInnerWidth, statsY, "github-dark"));
+    sections.push(dialogueLine("Section", segmentStart, endMs, panelX, filesHeadingY, "Tracked Files"));
+    if (snapshot.files.length === 0) {
+      sections.push(dialogueLine("EventText", segmentStart, endMs, panelX, fileStartY, "No watched file changes yet."));
+    } else {
+      snapshot.files.forEach((file, index) => {
+        const y = fileStartY + index * rowHeight;
+        const statusText = file.status.padEnd(6, " ");
+        sections.push(dialogueLine("FileStatus", segmentStart, endMs, statusX, y, escapeAssText(statusText)));
+        sections.push(dialogueLine("FileText", segmentStart, endMs, fileTextX, y, escapeAssText(file.path)));
+        sections.push(dialogueLine("FileMeta", segmentStart, endMs, fileMetaX, y, escapeAssText(`${file.scope}  ${file.sizeLabel}`)));
+      });
+    }
+    sections.push(dialogueLine("Section", segmentStart, endMs, panelX, recentHeadingY, "Recent Activity"));
+    if (snapshot.recent.length === 0) {
+      sections.push(dialogueLine("EventText", segmentStart, endMs, panelX, recentStartY, "Waiting for scenario activity."));
+    } else {
+      snapshot.recent.forEach((entry, index) => {
+        const y = recentStartY + index * rowHeight;
+        sections.push(dialogueLine("EventTime", segmentStart, endMs, recentTimeX, y, escapeAssText(entry.at)));
+        sections.push(dialogueLine("EventText", segmentStart, endMs, recentTextX, y, escapeAssText(entry.label)));
+      });
+    }
   }
 
   writeFileSync(assPath, `${sections.join("\n")}\n`, "utf8");
 
   const filter = [
-    `pad=iw+${config.recording.panelWidth}:ih:0:0:0x2a2928`,
-    `drawbox=x=iw-${config.recording.panelWidth}:y=0:w=${config.recording.panelWidth}:h=ih:color=0x2a2928@0.96:t=fill`,
+    `pad=iw+${config.recording.panelWidth}:ih:0:0:0x0D1117`,
+    `drawbox=x=${width}:y=0:w=${config.recording.panelWidth}:h=ih:color=0x0D1117@1:t=fill`,
+    `drawbox=x=${width}:y=0:w=2:h=${height}:color=0x30363D@1:t=fill`,
+    `drawbox=x=${width + panelPadding}:y=${panelPadding}:w=${panelInnerWidth}:h=${heroHeight}:color=0x161B22@1:t=fill`,
+    `drawbox=x=${width + panelPadding}:y=${filesCardY}:w=${panelInnerWidth}:h=${filesCardHeight}:color=0x161B22@1:t=fill`,
+    `drawbox=x=${width + panelPadding}:y=${recentCardY}:w=${panelInnerWidth}:h=${recentCardHeight}:color=0x161B22@1:t=fill`,
+    `drawbox=x=${width + panelPadding}:y=${panelPadding}:w=${panelInnerWidth}:h=${heroHeight}:color=0x30363D@1:t=2`,
+    `drawbox=x=${width + panelPadding}:y=${filesCardY}:w=${panelInnerWidth}:h=${filesCardHeight}:color=0x30363D@1:t=2`,
+    `drawbox=x=${width + panelPadding}:y=${recentCardY}:w=${panelInnerWidth}:h=${recentCardHeight}:color=0x30363D@1:t=2`,
     `ass='${assPath.replaceAll("'", "\\'")}'`
   ].join(",");
 
