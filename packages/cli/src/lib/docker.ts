@@ -132,7 +132,7 @@ function proxyConfigDir(root: string, projectName: string, nodeId: string): stri
   return resolve(root, ".state/generated", projectName, "proxy", nodeId, "config");
 }
 
-function writeBackendProxyConfig(root: string, config: E2EConfig): void {
+function writeBackendRuntimeConfigs(root: string, config: E2EConfig): void {
   const proxiedBackends = new Set(
     config.topology.servers
       .filter((node) => isProxyFamily(node.family))
@@ -140,12 +140,22 @@ function writeBackendProxyConfig(root: string, config: E2EConfig): void {
   );
 
   for (const backend of config.topology.servers) {
-    if (!isServerFamily(backend.family) || !proxiedBackends.has(backend.id)) {
+    if (!isServerFamily(backend.family)) {
       continue;
     }
 
     const runtimeRoot = resolve(root, ".state/runtime", backend.id);
     ensureDir(runtimeRoot);
+    const bukkitConfig = [
+      "settings:",
+      "  connection-throttle: -1"
+    ].join("\n");
+    Bun.write(join(runtimeRoot, "bukkit.yml"), `${bukkitConfig}\n`);
+
+    if (!proxiedBackends.has(backend.id)) {
+      continue;
+    }
+
     const spigotConfig = [
       "settings:",
       "  bungeecord: true"
@@ -269,7 +279,7 @@ export function writeComposeFile(root: string, config: E2EConfig, release: Resol
   ensureDir(stateRoot);
   ensureDir(resolve(root, ".state/runtime"));
   const gatewayNetworkId = randomUUID();
-  writeBackendProxyConfig(root, config);
+  writeBackendRuntimeConfigs(root, config);
   writeProxyConfigs(root, config);
   writePluginPortalConfigs(root, config);
   const composePath = join(stateRoot, "docker-compose.yml");

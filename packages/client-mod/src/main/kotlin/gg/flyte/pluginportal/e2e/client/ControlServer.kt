@@ -5,6 +5,7 @@ import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.screen.ChatScreen
 import net.minecraft.client.gui.screen.AccessibilityOnboardingScreen
 import net.minecraft.client.gui.screen.DeathScreen
+import net.minecraft.client.gui.screen.DisconnectedScreen
 import net.minecraft.client.gui.screen.TitleScreen
 import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen
 import net.minecraft.client.option.ServerList
@@ -29,6 +30,8 @@ class ControlServer(
 ) {
     private val gson = Gson()
     private val executor = Executors.newCachedThreadPool()
+    @Volatile private var pendingConnectionAddress: String? = null
+    @Volatile private var pendingConnectionStartedAt: Long = 0
 
     fun start() {
         executor.submit {
@@ -74,6 +77,23 @@ class ControlServer(
 
     private fun ping(request: ControlRequest): ControlResponse {
         val client = MinecraftClient.getInstance()
+        val currentScreen = client.currentScreen
+        val now = System.currentTimeMillis()
+        if (client.player != null && client.world != null) {
+            pendingConnectionAddress = null
+            pendingConnectionStartedAt = 0
+        } else if (
+            pendingConnectionAddress != null &&
+            now - pendingConnectionStartedAt > 2_000 &&
+            (
+                currentScreen is DisconnectedScreen ||
+                    currentScreen is TitleScreen ||
+                    currentScreen is MultiplayerScreen
+                )
+        ) {
+            pendingConnectionAddress = null
+        }
+
         return ControlResponse(
             id = request.id,
             ok = true,
@@ -82,8 +102,9 @@ class ControlServer(
                 "minecraftVersion" to SharedConstants.getGameVersion().name,
                 "playerPresent" to (client.player != null).toString(),
                 "worldLoaded" to (client.world != null).toString(),
-                "screenClass" to (client.currentScreen?.javaClass?.name ?: ""),
-                "screenTitle" to (client.currentScreen?.title?.string ?: "")
+                "screenClass" to (currentScreen?.javaClass?.name ?: ""),
+                "screenTitle" to (currentScreen?.title?.string ?: ""),
+                "pendingConnection" to (pendingConnectionAddress != null).toString()
             )
         )
     }
@@ -219,6 +240,8 @@ class ControlServer(
 
             connectMethod.isAccessible = true
             connectMethod.invoke(multiplayerScreen, serverInfo)
+            pendingConnectionAddress = addressValue
+            pendingConnectionStartedAt = System.currentTimeMillis()
             PluginPortalE2EClient.logger.info("Connecting to {}", addressValue)
             future.complete(
                 ControlResponse(

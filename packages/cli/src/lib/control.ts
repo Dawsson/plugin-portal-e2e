@@ -76,6 +76,7 @@ export async function ensureClientConnected(
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastConnectAttempt = 0;
+  let lastSeenScreen = "";
 
   while (Date.now() < deadline) {
     const response = await sendControlRequest(host, port, {
@@ -92,9 +93,17 @@ export async function ensureClientConnected(
     }
 
     const screenClass = response.result?.screenClass ?? "";
+    const screenTitle = response.result?.screenTitle ?? "";
+    const pendingConnection = response.result?.pendingConnection === "true";
     const now = Date.now();
     const isConnecting = screenClass.includes("ConnectScreen");
-    const canReconnect = !isConnecting && now - lastConnectAttempt >= 1_500;
+    const isDisconnected = screenClass.includes("DisconnectedScreen");
+    const retryDelayMs = isDisconnected ? 4_000 : 2_500;
+    const screenKey = `${screenClass}::${screenTitle}`;
+    if (screenKey !== lastSeenScreen) {
+      lastSeenScreen = screenKey;
+    }
+    const canReconnect = !isConnecting && !pendingConnection && now - lastConnectAttempt >= retryDelayMs;
 
     if (response.ok && canReconnect) {
       const connectResponse = await sendControlRequest(host, port, {
@@ -108,10 +117,10 @@ export async function ensureClientConnected(
       lastConnectAttempt = now;
     }
 
-    await Bun.sleep(isConnecting ? 300 : 500);
+    await Bun.sleep(isConnecting || pendingConnection ? 500 : 1_000);
   }
 
-  throw new Error("Timed out waiting for the Minecraft client to join the test server");
+  throw new Error(`Timed out waiting for the Minecraft client to join the test server (${lastSeenScreen || "no screen info"})`);
 }
 
 export async function waitForClientMenu(host: string, port: number, timeoutMs: number): Promise<void> {
