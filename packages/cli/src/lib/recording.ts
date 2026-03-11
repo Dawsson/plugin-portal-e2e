@@ -167,6 +167,38 @@ function dialogueLine(
   return `Dialogue: 0,${toAssTime(startMs)},${toAssTime(endMs)},${style},,0,0,0,,{\\pos(${x},${y})}${text}`;
 }
 
+function detectContentCrop(rawVideoPath: string, durationMs: number): { width: number; height: number; x: number; y: number } | null {
+  const seekSeconds = Math.max(1, Math.min(durationMs / 1000 / 3, 24));
+  const probe = runCommand([
+    "ffmpeg",
+    "-ss",
+    seekSeconds.toFixed(2),
+    "-i",
+    rawVideoPath,
+    "-vf",
+    "cropdetect=24:16:0",
+    "-frames:v",
+    "12",
+    "-f",
+    "null",
+    "-"
+  ]);
+  const output = `${probe.stdout}\n${probe.stderr}`;
+  const matches = [...output.matchAll(/crop=(\d+):(\d+):(\d+):(\d+)/g)];
+  const lastMatch = matches.at(-1);
+  if (!lastMatch) {
+    return null;
+  }
+
+  const [, width, height, x, y] = lastMatch;
+  return {
+    width: Number(width),
+    height: Number(height),
+    x: Number(x),
+    y: Number(y)
+  };
+}
+
 export function composeRunVideo(
   rawVideoPath: string,
   artifacts: ArtifactPaths,
@@ -199,18 +231,21 @@ export function composeRunVideo(
   const width = metadata.streams[0]?.width ?? 1280;
   const height = metadata.streams[0]?.height ?? 720;
   const durationMs = Math.ceil(Number(metadata.format.duration ?? 0) * 1000);
+  const crop = detectContentCrop(rawVideoPath, durationMs);
+  const contentWidth = crop?.width ?? width;
+  const contentHeight = crop?.height ?? height;
   const timelinePath = join(artifacts.data, "timeline.jsonl");
   const assPath = join(artifacts.video, "panel.ass");
   const outputPath = join(artifacts.video, "composited.mp4");
-  const uiScale = Math.min(1.6, Math.max(1, height / 900));
+  const uiScale = Math.min(1.6, Math.max(1, contentHeight / 900));
   const panelPadding = Math.round(18 * uiScale);
-  const panelX = width + panelPadding;
+  const panelX = contentWidth + panelPadding;
   const panelInnerWidth = config.recording.panelWidth - panelPadding * 2;
   const heroHeight = Math.round(104 * uiScale);
   const filesCardY = heroHeight + Math.round(30 * uiScale);
-  const filesCardHeight = Math.max(Math.round(316 * uiScale), Math.round(height * 0.27));
+  const filesCardHeight = Math.max(Math.round(316 * uiScale), Math.round(contentHeight * 0.27));
   const recentCardY = filesCardY + filesCardHeight + Math.round(12 * uiScale);
-  const recentCardHeight = Math.max(Math.round(320 * uiScale), height - recentCardY - panelPadding);
+  const recentCardHeight = Math.max(Math.round(320 * uiScale), contentHeight - recentCardY - panelPadding);
   const titleY = Math.round(40 * uiScale);
   const subtitleY = Math.round(72 * uiScale);
   const statsY = Math.round(95 * uiScale);
@@ -242,8 +277,8 @@ export function composeRunVideo(
   >();
   const sections = [
     "[Script Info]",
-    `PlayResX: ${width + config.recording.panelWidth}`,
-    `PlayResY: ${height}`,
+    `PlayResX: ${contentWidth + config.recording.panelWidth}`,
+    `PlayResY: ${contentHeight}`,
     "ScriptType: v4.00+",
     "",
     "[V4+ Styles]",
@@ -447,17 +482,18 @@ export function composeRunVideo(
   writeFileSync(assPath, `${sections.join("\n")}\n`, "utf8");
 
   const filter = [
+    crop ? `crop=${crop.width}:${crop.height}:${crop.x}:${crop.y}` : null,
     `pad=iw+${config.recording.panelWidth}:ih:0:0:0x0D1117`,
-    `drawbox=x=${width}:y=0:w=${config.recording.panelWidth}:h=ih:color=0x0D1117@1:t=fill`,
-    `drawbox=x=${width}:y=0:w=2:h=${height}:color=0x30363D@1:t=fill`,
-    `drawbox=x=${width + panelPadding}:y=${panelPadding}:w=${panelInnerWidth}:h=${heroHeight}:color=0x161B22@1:t=fill`,
-    `drawbox=x=${width + panelPadding}:y=${filesCardY}:w=${panelInnerWidth}:h=${filesCardHeight}:color=0x161B22@1:t=fill`,
-    `drawbox=x=${width + panelPadding}:y=${recentCardY}:w=${panelInnerWidth}:h=${recentCardHeight}:color=0x161B22@1:t=fill`,
-    `drawbox=x=${width + panelPadding}:y=${panelPadding}:w=${panelInnerWidth}:h=${heroHeight}:color=0x30363D@1:t=2`,
-    `drawbox=x=${width + panelPadding}:y=${filesCardY}:w=${panelInnerWidth}:h=${filesCardHeight}:color=0x30363D@1:t=2`,
-    `drawbox=x=${width + panelPadding}:y=${recentCardY}:w=${panelInnerWidth}:h=${recentCardHeight}:color=0x30363D@1:t=2`,
+    `drawbox=x=${contentWidth}:y=0:w=${config.recording.panelWidth}:h=ih:color=0x0D1117@1:t=fill`,
+    `drawbox=x=${contentWidth}:y=0:w=2:h=${contentHeight}:color=0x30363D@1:t=fill`,
+    `drawbox=x=${contentWidth + panelPadding}:y=${panelPadding}:w=${panelInnerWidth}:h=${heroHeight}:color=0x161B22@1:t=fill`,
+    `drawbox=x=${contentWidth + panelPadding}:y=${filesCardY}:w=${panelInnerWidth}:h=${filesCardHeight}:color=0x161B22@1:t=fill`,
+    `drawbox=x=${contentWidth + panelPadding}:y=${recentCardY}:w=${panelInnerWidth}:h=${recentCardHeight}:color=0x161B22@1:t=fill`,
+    `drawbox=x=${contentWidth + panelPadding}:y=${panelPadding}:w=${panelInnerWidth}:h=${heroHeight}:color=0x30363D@1:t=2`,
+    `drawbox=x=${contentWidth + panelPadding}:y=${filesCardY}:w=${panelInnerWidth}:h=${filesCardHeight}:color=0x30363D@1:t=2`,
+    `drawbox=x=${contentWidth + panelPadding}:y=${recentCardY}:w=${panelInnerWidth}:h=${recentCardHeight}:color=0x30363D@1:t=2`,
     `ass='${assPath.replaceAll("'", "\\'")}'`
-  ].join(",");
+  ].filter(Boolean).join(",");
 
   const compose = runCommand([
     "ffmpeg",
