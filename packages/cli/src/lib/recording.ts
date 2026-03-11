@@ -264,6 +264,9 @@ export function composeRunVideo(
     .filter(Boolean)
     .map((line) => JSON.parse(line) as Record<string, unknown>)
     .filter((event) => event.type !== "service.log");
+  const recordingStartedAt = Number(
+    events.find((event) => event.type === "recording.started")?.tMs ?? 0
+  );
   const fileState = new Map<
     string,
     {
@@ -303,7 +306,10 @@ export function composeRunVideo(
 
   for (let sample = 0; sample <= durationMs + 500; sample += 500) {
     for (const event of events) {
-      const tMs = Number(event.tMs ?? 0);
+      const tMs = Number(event.tMs ?? 0) - recordingStartedAt;
+      if (tMs < 0) {
+        continue;
+      }
       if (tMs > sample) {
         break;
       }
@@ -325,16 +331,20 @@ export function composeRunVideo(
     }
 
     const recent = events
-      .filter((event) => Number(event.tMs ?? 0) <= sample)
+      .map((event) => ({
+        event,
+        tMs: Number(event.tMs ?? 0) - recordingStartedAt
+      }))
+      .filter(({ tMs }) => tMs >= 0 && tMs <= sample)
       .map((event) => {
-        const label = eventLabel(event);
+        const label = eventLabel(event.event);
         if (!label) {
           return null;
         }
 
         return {
           label: shortenMiddle(label, 46),
-          at: formatElapsed(Number(event.tMs ?? 0))
+          at: formatElapsed(event.tMs)
         };
       })
       .filter((value): value is { label: string; at: string } => Boolean(value))
@@ -353,7 +363,10 @@ export function composeRunVideo(
     const state = JSON.stringify({
       elapsed: formatElapsed(sample),
       fileCount: fileState.size,
-      eventCount: events.filter((event) => Number(event.tMs ?? 0) <= sample && eventLabel(event)).length,
+      eventCount: events.filter((event) => {
+        const tMs = Number(event.tMs ?? 0) - recordingStartedAt;
+        return tMs >= 0 && tMs <= sample && eventLabel(event);
+      }).length,
       files,
       recent
     });
