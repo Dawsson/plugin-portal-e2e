@@ -73,6 +73,7 @@ export interface ServerNode {
 export interface ScenarioStep {
   action:
     | "runCommand"
+    | "connectClient"
     | "waitForChat"
     | "takeScreenshot"
     | "clickChat"
@@ -91,6 +92,10 @@ export interface ScenarioStep {
   text?: string;
   timeoutMs?: number;
   delayMs?: number;
+  beforeDelayMs?: number;
+  afterDelayMs?: number;
+  visualize?: boolean;
+  address?: string;
   openChat?: boolean;
   service?: string;
   command?: string;

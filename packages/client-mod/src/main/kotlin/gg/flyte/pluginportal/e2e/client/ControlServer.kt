@@ -7,7 +7,6 @@ import net.minecraft.client.gui.screen.AccessibilityOnboardingScreen
 import net.minecraft.client.gui.screen.DeathScreen
 import net.minecraft.client.gui.screen.TitleScreen
 import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen
-import net.minecraft.client.gui.screen.multiplayer.MultiplayerServerListWidget
 import net.minecraft.client.option.ServerList
 import net.minecraft.client.network.ServerInfo
 import net.minecraft.client.util.ScreenshotRecorder
@@ -199,43 +198,27 @@ class ControlServer(
             val multiplayerScreen = MultiplayerScreen(TitleScreen())
             client.setScreen(multiplayerScreen)
             multiplayerScreen.init(client, client.window.scaledWidth, client.window.scaledHeight)
-
             val serverList = multiplayerScreen.serverList
             serverList.tryUnhide(addressValue)
             serverList.add(serverInfo, true)
             serverList.saveFile()
+            val connectMethod = MultiplayerScreen::class.java.declaredMethods.firstOrNull { method ->
+                method.parameterTypes.contentEquals(arrayOf(ServerInfo::class.java))
+            }
 
-            val serverListWidget = multiplayerScreen.children()
-                .firstOrNull { it is MultiplayerServerListWidget } as? MultiplayerServerListWidget
-
-            if (serverListWidget == null) {
+            if (connectMethod == null) {
                 future.complete(
                     ControlResponse(
                         id = request.id,
                         ok = false,
-                        message = "Multiplayer server list widget was not available"
+                        message = "Could not locate MultiplayerScreen server connect method"
                     )
                 )
                 return@execute
             }
 
-            serverListWidget.setServers(serverList)
-            val entry = serverListWidget.children().firstOrNull()
-
-            if (entry == null) {
-                future.complete(
-                    ControlResponse(
-                        id = request.id,
-                        ok = false,
-                        message = "No multiplayer server entry was created"
-                    )
-                )
-                return@execute
-            }
-
-            serverListWidget.setSelected(entry)
-            multiplayerScreen.select(entry)
-            multiplayerScreen.connect()
+            connectMethod.isAccessible = true
+            connectMethod.invoke(multiplayerScreen, serverInfo)
             PluginPortalE2EClient.logger.info("Connecting to {}", addressValue)
             future.complete(
                 ControlResponse(

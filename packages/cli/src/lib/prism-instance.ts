@@ -159,6 +159,7 @@ export async function ensurePrismInstance(
   const instanceDir = join(instanceRoot, client.prism.instanceName);
   const minecraftDir = join(instanceDir, "minecraft");
   const modsDir = join(minecraftDir, "mods");
+  const serversPath = join(minecraftDir, "servers.dat");
 
   ensureDir(instanceDir);
   ensureDir(minecraftDir);
@@ -199,6 +200,8 @@ export async function ensurePrismInstance(
     syncDependencyJar(modsDir, jarPath);
   }
 
+  // Keep the multiplayer list deterministic so automation does not select a stale hidden server.
+  rmSync(serversPath, { force: true });
   writeAutomationOptions(minecraftDir);
 
   const groupFile = join(instanceRoot, "instgroups.json");

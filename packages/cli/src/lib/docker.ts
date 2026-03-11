@@ -305,13 +305,21 @@ export async function waitForServiceLog(
   root: string,
   service: string,
   pattern: RegExp,
-  timeoutMs: number
+  timeoutMs: number,
+  options: {
+    since?: Date;
+  } = {}
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
+    const args = ["docker", "compose", "-f", composePath, "logs", "--no-color", "--tail=200"];
+    if (options.since) {
+      args.push("--since", options.since.toISOString());
+    }
+    args.push(service);
     const result = runCommand(
-      ["docker", "compose", "-f", composePath, "logs", "--no-color", "--tail=200", service],
+      args,
       root
     );
 

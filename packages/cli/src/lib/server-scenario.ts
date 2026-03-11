@@ -285,20 +285,23 @@ export async function runServerScenarios(
 
       if (step.action === "restartService") {
         const service = step.service ?? "paper-main";
+        const restartStartedAt = new Date();
         dockerComposeRestart(composePath, root, service);
         await waitForServiceLog(
           composePath,
           root,
           service,
           /Done \([^)]+\)! For help, type "help"/,
-          step.timeoutMs ?? 180_000
+          step.timeoutMs ?? 180_000,
+          { since: restartStartedAt }
         );
         await waitForServiceLog(
           composePath,
           root,
           service,
           /RCON running on 0\.0\.0\.0:25575/,
-          30_000
+          30_000,
+          { since: restartStartedAt }
         );
         timeline.write({
           type: "scenario.step.finished",

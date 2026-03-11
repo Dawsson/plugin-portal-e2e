@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { appendFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { ArtifactPaths } from "./artifacts.ts";
-import { sendControlRequest } from "./control.ts";
+import { sendControlRequest, waitForClientMenu, waitForClientReady } from "./control.ts";
 import { dockerComposeRestart, waitForServiceLog } from "./docker.ts";
 import { runConsoleCommand, runRconCommand } from "./rcon.ts";
 import type { E2EConfig } from "../types.ts";
@@ -118,7 +118,10 @@ export async function runScenarios(
         const response = await sendControlRequest("127.0.0.1", 44712, {
           id,
           action: "runCommand",
-          command: step.value
+          command: step.value,
+          visualize: step.visualize,
+          beforeDelayMs: step.beforeDelayMs,
+          afterDelayMs: step.afterDelayMs
         });
         hooks.onStepFinished?.({
           scenario: scenario.id,
@@ -128,6 +131,36 @@ export async function runScenarios(
           command: step.value
         });
         lastChatSequence = Number(response.result?.afterSequence ?? lastChatSequence);
+        continue;
+      }
+
+      if (step.action === "connectClient") {
+        const hostPort = config.topology.hostPort ?? 25565;
+        const address = step.address ?? `127.0.0.1:${hostPort}`;
+        await waitForClientMenu("127.0.0.1", 44712, step.timeoutMs ?? 30_000);
+        const response = await sendControlRequest("127.0.0.1", 44712, {
+          id,
+          action: "connect",
+          address
+        });
+        if (!response.ok) {
+          throw new Error(response.message);
+        }
+        await waitForClientReady("127.0.0.1", 44712, step.timeoutMs ?? 180_000);
+        const resumeResponse = await sendControlRequest("127.0.0.1", 44712, {
+          id: `${id}-resume`,
+          action: "resumeGame"
+        });
+        if (!resumeResponse.ok) {
+          throw new Error(resumeResponse.message);
+        }
+        hooks.onStepFinished?.({
+          scenario: scenario.id,
+          stepIndex: index,
+          action: step.action,
+          ok: true,
+          address
+        });
         continue;
       }
 
@@ -280,20 +313,23 @@ export async function runScenarios(
           throw new Error("restartService requires a server-backed run context");
         }
         const service = step.service ?? "paper-main";
+        const restartStartedAt = new Date();
         dockerComposeRestart(context.composePath, context.root, service);
         await waitForServiceLog(
           context.composePath,
           context.root,
           service,
           /Done \([^)]+\)! For help, type "help"/,
-          step.timeoutMs ?? 180_000
+          step.timeoutMs ?? 180_000,
+          { since: restartStartedAt }
         );
         await waitForServiceLog(
           context.composePath,
           context.root,
           service,
           /RCON running on 0\.0\.0\.0:25575/,
-          30_000
+          30_000,
+          { since: restartStartedAt }
         );
         hooks.onStepFinished?.({
           scenario: scenario.id,

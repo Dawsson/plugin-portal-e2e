@@ -38,7 +38,15 @@ const serverSchema = z.object({
 const stepSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("runCommand"),
-    value: z.string()
+    value: z.string(),
+    visualize: z.boolean().optional(),
+    beforeDelayMs: z.number().int().nonnegative().optional(),
+    afterDelayMs: z.number().int().nonnegative().optional()
+  }),
+  z.object({
+    action: z.literal("connectClient"),
+    address: z.string().optional(),
+    timeoutMs: z.number().int().positive().optional()
   }),
   z.object({
     action: z.literal("waitForChat"),
