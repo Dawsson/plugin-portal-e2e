@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, readdirSync, rmSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import type { E2EConfig, ServerFamily } from "../types.ts";
+import type { E2EConfig, ProxyFamily, ServerFamily } from "../types.ts";
 import { getArtifactPaths } from "../lib/artifacts.ts";
 import { dockerComposeDown, dockerComposeUp, waitForServiceLog, writeComposeFile } from "../lib/docker.ts";
 import { runScenarios } from "../lib/scenario.ts";
@@ -23,8 +23,28 @@ function isBackendFamily(family: string): family is ServerFamily {
   return family === "paper" || family === "purpur" || family === "pufferfish" || family === "spigot";
 }
 
-function isProxyFamily(family: string): boolean {
+function isProxyFamily(family: string): family is ProxyFamily {
   return family === "velocity" || family === "waterfall" || family === "bungeecord";
+}
+
+function proxyReadyPattern(family: ProxyFamily): RegExp {
+  switch (family) {
+    case "velocity":
+      return /Listening on/;
+    case "waterfall":
+    case "bungeecord":
+      return /Listening on \/0\.0\.0\.0:25577/;
+  }
+}
+
+function proxyPluginLoadedPattern(family: ProxyFamily): RegExp | null {
+  switch (family) {
+    case "velocity":
+      return /Loaded plugin pluginportal/i;
+    case "waterfall":
+    case "bungeecord":
+      return null;
+  }
 }
 
 function cleanServerRuntime(root: string, config: E2EConfig): void {
@@ -135,6 +155,11 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
   composeLogs = startComposeLogCapture(composePath, root, artifacts, timeline);
   runtimeWatchers = await startRuntimeWatchers(root, config, timeline);
   const backendServers = config.topology.servers.filter((server) => isBackendFamily(server.family));
+  const proxyServers = config.topology.servers.filter(
+    (
+      server
+    ): server is E2EConfig["topology"]["servers"][number] & { family: ProxyFamily } => isProxyFamily(server.family)
+  );
   if (backendServers.length === 0) {
     throw new Error("No backend server is configured in the current topology");
   }
@@ -147,6 +172,19 @@ export async function runPreset(root: string, config: E2EConfig, mode: "run" | "
       backend.id,
       /Done \([^)]+\)! For help, type "help"/,
       180_000
+    );
+  }
+  for (const proxy of proxyServers) {
+    const pluginLoadedPattern = proxyPluginLoadedPattern(proxy.family);
+    if (pluginLoadedPattern) {
+      await waitForServiceLog(composePath, root, proxy.id, pluginLoadedPattern, 60_000);
+    }
+    await waitForServiceLog(
+      composePath,
+      root,
+      proxy.id,
+      proxyReadyPattern(proxy.family),
+      60_000
     );
   }
   await waitForPort("127.0.0.1", hostPort, 180_000);

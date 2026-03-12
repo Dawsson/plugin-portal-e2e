@@ -31,6 +31,16 @@ function proxyReadyPattern(family: ProxyFamily): RegExp {
   }
 }
 
+function proxyPluginLoadedPattern(family: ProxyFamily): RegExp {
+  switch (family) {
+    case "velocity":
+      return /Loaded plugin pluginportal\b/i;
+    case "waterfall":
+    case "bungeecord":
+      return /(?:Loaded|Enabled) plugin .*pluginportal/i;
+  }
+}
+
 function cleanServerRuntime(root: string, config: E2EConfig): void {
   for (const node of config.topology.servers) {
     if (isBackendFamily(node.family)) {
@@ -101,6 +111,7 @@ async function verifySingle(root: string, config: E2EConfig): Promise<{ projectN
       ): server is E2EConfig["topology"]["servers"][number] & { family: ProxyFamily } => isProxyFamily(server.family)
     );
     for (const proxy of proxies) {
+      await waitForServiceLog(composePath, root, proxy.id, proxyPluginLoadedPattern(proxy.family), 90_000);
       await waitForServiceLog(composePath, root, proxy.id, proxyReadyPattern(proxy.family), 60_000);
     }
 
